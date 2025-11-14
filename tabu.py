@@ -1,5 +1,7 @@
+import statistics
+
 def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
-    n=len(x0);x=x0[:];best_x=x[:];best_f=func(x);tabu={}
+    n=len(x0);x=x0[:];best_x=x[:];best_f=func(x);tabu={};f_values=[]
     for _ in range(max_iter):
         neighbors=[]
         for i in range(n):
@@ -7,7 +9,9 @@ def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
                 x_new=x[:];x_new[i]+=d
                 if bounds:
                     if not(bounds[0]<=x_new[i]<=bounds[1]):continue
-                neighbors.append(((i,d),x_new,func(x_new)))
+                f_new = func(x_new)
+                f_values.append(f_new)
+                neighbors.append(((i,d),x_new,f_new))
         neighbors.sort(key=lambda t:t[2])
         move=None
         for m,xn,fn in neighbors:
@@ -18,4 +22,11 @@ def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
         if fx<best_f:best_x,best_f=x[:],fx
         tabu={mv:t-1 for mv,t in tabu.items() if t-1>0}
         tabu[(move[0],-move[1])]=tenure
-    return best_x,best_f
+    
+    avg_f = sum(f_values) / len(f_values) if f_values else 0
+    median_f = statistics.median(f_values) if f_values else 0
+    max_f = max(f_values) if f_values else 0
+    
+    return best_x, best_f, avg_f, median_f, max_f
+
+

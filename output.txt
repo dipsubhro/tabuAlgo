@@ -1,8 +1,8 @@
 Tabu Search Results
 ===================
 
-Sphere       → Best x = [0, 0, 0, 0, 0],  f(x) = 0.000000
-Rastrigin    → Best x = [0, 0, 0, 0, 0],  f(x) = 0.000000
-Ackley       → Best x = [0, 0, 0, 0, 0],  f(x) = 0.000000
-Rosenbrock   → Best x = [1, 1, 1, 1, 1],  f(x) = 0.000000
-Step         → Best x = [0, 0, 0, 0, 0],  f(x) = 0.000000
+Sphere       → Best x = [0, -1, 1, 0, 1], Best f(x) = 3.000000   | Avg f(x) = 11.400000  | Median f(x) = 10.000000  | Max f(x) = 25.000000 
+rastrigin    → Best x = [0, -1, 1, 0, 1], Best f(x) = 3.000000   | Avg f(x) = 11.400000  | Median f(x) = 10.000000  | Max f(x) = 25.000000 
+ackley       → Best x = [0, -1, 1, 0, 1], Best f(x) = 2.870315   | Avg f(x) = 5.024322   | Median f(x) = 4.927234   | Max f(x) = 7.211854  
+rosenbrock   → Best x = [0, -1, 1, 1, 2], Best f(x) = 205.000000 | Avg f(x) = 5409.600000 | Median f(x) = 2707.500000 | Max f(x) = 33819.000000
+step         → Best x = [0, -1, 1, 0, 1], Best f(x) = 3.000000   | Avg f(x) = 11.400000  | Median f(x) = 10.000000  | Max f(x) = 25.000000 
