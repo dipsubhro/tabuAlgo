@@ -1,17 +1,31 @@
 import statistics
+import numpy as np
 
 def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
     n=len(x0);x=x0[:];best_x=x[:];best_f=func(x);tabu={};f_values=[]
     for _ in range(max_iter):
         neighbors=[]
-        for i in range(n):
-            for d in(-1,1):
-                x_new=x[:];x_new[i]+=d
-                if bounds:
-                    if not(bounds[0]<=x_new[i]<=bounds[1]):continue
-                f_new = func(x_new)
-                f_values.append(f_new)
-                neighbors.append(((i,d),x_new,f_new))
+        # Generate a fixed number of random neighbors, e.g., 2 * n
+        num_random_neighbors = 2 * n # Keep the same number of neighbors as before
+        for _ in range(num_random_neighbors):
+            x_new = x[:]
+            # Choose a random dimension to perturb
+            i = np.random.randint(0, n)
+            # Generate a random delta within a small range, e.g., -0.5 to 0.5
+            # The range of delta should be related to the bounds or problem scale.
+            # For now, let's use a fixed small range.
+            delta = np.random.uniform(-0.5, 0.5)
+            x_new[i] += delta
+
+            if bounds:
+                # Ensure the new value stays within bounds
+                x_new[i] = max(bounds[0], min(bounds[1], x_new[i]))
+
+            f_new = func(x_new)
+            f_values.append(f_new)
+            # The 'move' tuple needs to be adjusted as 'd' is no longer -1 or 1
+            # I'll use (i, delta) as the move
+            neighbors.append(((i,delta),x_new,f_new))
         neighbors.sort(key=lambda t:t[2])
         move=None
         for m,xn,fn in neighbors:
