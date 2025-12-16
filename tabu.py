@@ -2,45 +2,83 @@ import statistics
 import numpy as np
 
 def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
-    n=len(x0);x=x0[:];best_x=x[:];best_f=func(x);tabu={};f_values=[]
+    num_dimensions = len(x0)
+    current_solution = list(x0)  # Use list for mutability
+    best_solution = list(current_solution)
+    best_objective_value = func(current_solution)
+    tabu_list = {}
+    all_objective_values = []
+
     for _ in range(max_iter):
-        neighbors=[]
-        # Generate a fixed number of random neighbors, e.g., 2 * n
-        num_random_neighbors = 2 * n # Keep the same number of neighbors as before
+        neighbors = []
+
+        # Generate neighbors
+        num_random_neighbors = 2 * num_dimensions
         for _ in range(num_random_neighbors):
-            x_new = x[:]
-            # Choose a random dimension to perturb
-            i = np.random.randint(0, n)
-            # Generate a random delta within a small range, e.g., -0.5 to 0.5
-            # The range of delta should be related to the bounds or problem scale.
-            # For now, let's use a fixed small range.
-            delta = np.random.uniform(-0.5, 0.5)
-            x_new[i] += delta
+            new_solution_candidate = list(current_solution)
+            
+            # Select a random dimension to perturb
+            dimension_index = np.random.randint(0, num_dimensions)
+            perturbation_delta = np.random.uniform(-0.5, 0.5)
+            new_solution_candidate[dimension_index] += perturbation_delta
 
+            # Apply bounds if provided
             if bounds:
-                # Ensure the new value stays within bounds
-                x_new[i] = max(bounds[0], min(bounds[1], x_new[i]))
+                new_solution_candidate[dimension_index] = max(bounds[0], min(bounds[1], new_solution_candidate[dimension_index]))
 
-            f_new = func(x_new)
-            f_values.append(f_new)
-            # The 'move' tuple needs to be adjusted as 'd' is no longer -1 or 1
-            # I'll use (i, delta) as the move
-            neighbors.append(((i,delta),x_new,f_new))
-        neighbors.sort(key=lambda t:t[2])
-        move=None
-        for m,xn,fn in neighbors:
-            rev=(m[0],-m[1])
-            if rev not in tabu or fn<best_f:
-                move,x,fx=m,xn,fn;break
-        if move is None:break
-        if fx<best_f:best_x,best_f=x[:],fx
-        tabu={mv:t-1 for mv,t in tabu.items() if t-1>0}
-        tabu[(move[0],-move[1])]=tenure
+            # Evaluate the new solution
+            new_objective_value = func(new_solution_candidate)
+            all_objective_values.append(new_objective_value)
+            
+            # Store move details, new solution, and its objective value
+            neighbors.append(((dimension_index, perturbation_delta), new_solution_candidate, new_objective_value))
+        
+        # Sort neighbors by their objective value (ascending for minimization)
+        neighbors.sort(key=lambda t: t[2])
+
+        best_neighbor_move = None
+        best_neighbor_solution = None
+        best_neighbor_objective_value = None
+
+        # Find the best non-tabu neighbor or an aspiration criteria satisfying move
+        for move_details, neighbor_solution, neighbor_objective_value in neighbors:
+            # A move is defined by (dimension_index, perturbation_delta)
+            # The reverse move is (dimension_index, -perturbation_delta) which would undo the perturbation
+            reverse_move_identifier = (move_details[0], -move_details[1]) 
+            
+            # Aspiration Criteria: if the neighbor is better than the global best, accept it even if tabu
+            if reverse_move_identifier not in tabu_list or neighbor_objective_value < best_objective_value:
+                best_neighbor_move = move_details
+                best_neighbor_solution = neighbor_solution
+                best_neighbor_objective_value = neighbor_objective_value
+                break # Found an acceptable move, take it
+
+        # If no acceptable move is found, stop the search
+        if best_neighbor_move is None:
+            break
+
+        # Update current solution
+        current_solution = list(best_neighbor_solution)
+        current_objective_value = best_neighbor_objective_value
+
+        # Update global best if a better solution is found
+        if current_objective_value < best_objective_value:
+            best_solution = list(current_solution)
+            best_objective_value = current_objective_value
+
+        # Decrement tenure for all moves in the tabu list
+        tabu_list = {move: t - 1 for move, t in tabu_list.items() if t - 1 > 0}
+        
+        # Add the reverse of the chosen move to the tabu list
+        # This prevents immediately reversing the last move
+        tabu_list[reverse_move_identifier] = tenure
     
-    avg_f = sum(f_values) / len(f_values) if f_values else 0
-    median_f = statistics.median(f_values) if f_values else 0
-    max_f = max(f_values) if f_values else 0
+    # Calculate statistics of all explored objective values
+    avg_f = sum(all_objective_values) / len(all_objective_values) if all_objective_values else 0
+    median_f = statistics.median(all_objective_values) if all_objective_values else 0
+    max_f = max(all_objective_values) if all_objective_values else 0
     
-    return best_x, best_f, avg_f, median_f, max_f
+    return best_solution, best_objective_value, avg_f, median_f, max_f
+
 
 

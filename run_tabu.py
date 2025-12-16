@@ -3,8 +3,8 @@ from func import sphere, rastrigin, ackley, rosenbrock, step
 import numpy as np
 from tabulate import tabulate
 
-bounds = (-2, 2)
-NUM_RUNS = 100
+bounds = (-5, 5)
+NUM_RUNS = 30
 
 funcs = {
     "Sphere": sphere,
@@ -23,7 +23,7 @@ for name, fn in funcs.items():
 
     for _ in range(NUM_RUNS):
         x0 = np.random.uniform(bounds[0], bounds[1], size=5)
-        best_x, best_f, _, _, _ = tabu_search(fn, x0, tenure=2, max_iter=100, bounds=bounds)
+        best_x, best_f, _, _, _ = tabu_search(fn, x0, tenure=5, max_iter=1000, bounds=bounds)
         all_best_fs.append(best_f)
         if best_f < best_f_overall:
             best_f_overall = best_f
@@ -31,7 +31,7 @@ for name, fn in funcs.items():
 
     count_best = sum(1 for f in all_best_fs if np.isclose(f, best_f_overall))
     
-    global_min_chance = (count_best / NUM_RUNS) * 100
+    global_min_rate = count_best / NUM_RUNS
 
     avg_best_f = np.mean(all_best_fs)
     median_best_f = np.median(all_best_fs)
@@ -39,12 +39,12 @@ for name, fn in funcs.items():
 
     results_data.append([
         name, 
-        str(best_x_overall), 
+        "[" + ",\n".join(str(x) for x in best_x_overall) + "]", 
         f"{best_f_overall:.6f}", 
         f"{avg_best_f:.6f}", 
         f"{median_best_f:.6f}", 
         f"{max_best_f:.6f}",
-        f"{global_min_chance:.2f}%"
+        f"{global_min_rate:.2f}"
     ])
 
 with open("output.txt", "w") as f:
@@ -52,7 +52,7 @@ with open("output.txt", "w") as f:
     f.write("==============================\n\n")
     f.write(f"Number of runs per function: {NUM_RUNS}\n\n")
     
-    headers = ["Function", "Best x", "Best f(x)", "Avg Best f(x)", "Median Best f(x)", "Max Best f(x)", "Global Min Chance (%)"]
+    headers = ["Function", "Best x", "Best f(x)", "Avg Best f(x)", "Median Best f(x)", "Max Best f(x)", "Global Min Rate"]
     table = tabulate(results_data, headers=headers, tablefmt="grid")
     
     f.write(table)
