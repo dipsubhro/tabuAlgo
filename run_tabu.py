@@ -1,5 +1,9 @@
 from tabu import tabu_search
-from func import sphere, rastrigin, ackley, rosenbrock, step
+from func import (
+    sphere, rastrigin, ackley, rosenbrock, step,
+    schwefel, griewank, levy, zakharov, bohachevsky,
+    schaffer_n2, matyas, sum_of_squares, trid, booth
+)
 import numpy as np
 from tabulate import tabulate
 from concurrent.futures import ProcessPoolExecutor
@@ -10,10 +14,20 @@ NEIGHBORS_SIZE = 10
 
 funcs = {
     "Sphere": sphere,
-    "ackley": ackley,
-    "rosenbrock": rosenbrock,
-    "rastrigin": rastrigin,
-    "step": step
+    "Rastrigin": rastrigin,
+    "Ackley": ackley,
+    "Rosenbrock": rosenbrock,
+    "Step": step,
+    "Schwefel": schwefel,
+    "Griewank": griewank,
+    "Levy": levy,
+    "Zakharov": zakharov,
+    "Bohachevsky": bohachevsky,
+    "Schaffer_N2": schaffer_n2,
+    "Matyas": matyas,
+    "Sum_of_Squares": sum_of_squares,
+    "Trid": trid,
+    "Booth": booth,
 }
 
 def run_experiment(args):
