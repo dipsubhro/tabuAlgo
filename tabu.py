@@ -57,6 +57,9 @@ def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
         if best_neighbor_move is None:
             break
 
+        # Calculate the reverse move identifier from the chosen move
+        reverse_move_identifier = (best_neighbor_move[0], -best_neighbor_move[1])
+
         # Update current solution
         current_solution = list(best_neighbor_solution)
         current_objective_value = best_neighbor_objective_value

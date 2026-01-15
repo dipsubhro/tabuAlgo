@@ -5,7 +5,7 @@ from tabulate import tabulate
 from concurrent.futures import ProcessPoolExecutor
 
 bounds = (-5, 5)
-NUM_RUNS = 30
+NUM_RUNS = 100
 
 funcs = {
     "Sphere": sphere,
@@ -81,4 +81,4 @@ if __name__ == "__main__":
         
         f.write(table)
 
-    print("✅ Results saved to output.txt")
+    print("Results saved to output.txt")
