@@ -4,8 +4,9 @@ import numpy as np
 from tabulate import tabulate
 from concurrent.futures import ProcessPoolExecutor
 
-bounds = (-5, 5)
+BOUNDS = (-5, 5)
 NUM_RUNS = 100
+NEIGHBORS_SIZE = 10
 
 funcs = {
     "Sphere": sphere,
@@ -18,9 +19,9 @@ funcs = {
 def run_experiment(args):
     """
     Runs the full experiment (NUM_RUNS iterations) for a specific function.
-    args: tuple containing (name, fn, bounds, num_runs)
+    args: tuple containing (name, fn, bounds, num_runs, neighbors_size)
     """
-    name, fn, bounds, num_runs = args
+    name, fn, bounds, num_runs, neighbors_size = args
     
     # Re-seed to ensure independence for this process
     np.random.seed()
@@ -34,7 +35,7 @@ def run_experiment(args):
     # Run the tabu search num_runs times sequentially within this process
     for _ in range(num_runs):
         x0 = np.random.uniform(bounds[0], bounds[1], size=5)
-        best_x, best_f, _, _, _ = tabu_search(fn, x0, tenure=5, max_iter=1000, bounds=bounds)
+        best_x, best_f, _, _, _ = tabu_search(fn, x0, tenure=5, max_iter=1000, bounds=bounds, neighbors_size=neighbors_size)
         all_best_fs.append(best_f)
         if best_f < best_f_overall:
             best_f_overall = best_f
@@ -63,7 +64,7 @@ def run_experiment(args):
 
 if __name__ == "__main__":
     # Prepare arguments for each function
-    experiment_args = [(name, fn, bounds, NUM_RUNS) for name, fn in funcs.items()]
+    experiment_args = [(name, fn, BOUNDS, NUM_RUNS, NEIGHBORS_SIZE) for name, fn in funcs.items()]
     
     # Run experiments in parallel
     # We use a max_workers equal to len(funcs) or let it default (usually num_cpus)

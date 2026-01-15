@@ -1,7 +1,7 @@
 import statistics
 import numpy as np
 
-def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
+def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None, neighbors_size=10):
     num_dimensions = len(x0)
     current_solution = list(x0)  # Use list for mutability
     best_solution = list(current_solution)
@@ -13,8 +13,7 @@ def tabu_search(func, x0, tenure=2, max_iter=100, bounds=None):
         neighbors = []
 
         # Generate neighbors
-        num_random_neighbors = 2 * num_dimensions
-        for _ in range(num_random_neighbors):
+        for _ in range(neighbors_size):
             new_solution_candidate = list(current_solution)
             
             # Select a random dimension to perturb
