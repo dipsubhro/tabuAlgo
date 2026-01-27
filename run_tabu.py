@@ -1,99 +1,42 @@
+"""Tabu Search Runner Function"""
+
 from tabu import tabu_search
-from func import (
-    sphere, rastrigin, ackley, rosenbrock, step,
-    schwefel, griewank, levy, zakharov, bohachevsky,
-    schaffer_n2, matyas, sum_of_squares, trid, booth
-)
 import numpy as np
-from tabulate import tabulate
-from concurrent.futures import ProcessPoolExecutor
 
-BOUNDS = (-5, 5)
-NUM_RUNS = 100
-NEIGHBORS_SIZE = 10
 
-funcs = {
-    "Sphere": sphere,
-    "Rastrigin": rastrigin,
-    "Ackley": ackley,
-    "Rosenbrock": rosenbrock,
-    "Step": step,
-    "Schwefel": schwefel,
-    "Griewank": griewank,
-    "Levy": levy,
-    "Zakharov": zakharov,
-    "Bohachevsky": bohachevsky,
-    "Schaffer_N2": schaffer_n2,
-    "Matyas": matyas,
-    "Sum_of_Squares": sum_of_squares,
-    "Trid": trid,
-    "Booth": booth,
-}
-
-def run_experiment(args):
+def run_tabu(fn, num_runs=25, neighbors=10, tenure=5, max_iter=1000, bounds=(-5, 5), dims=5):
     """
-    Runs the full experiment (NUM_RUNS iterations) for a specific function.
-    args: tuple containing (name, fn, bounds, num_runs, neighbors_size)
+    Run tabu search on a function multiple times.
+    
+    Args:
+        fn: The objective function to minimize
+        num_runs: Number of runs
+        neighbors: Neighbors per iteration
+        tenure: Tabu tenure
+        max_iter: Max iterations
+        bounds: (min, max) tuple
+        dims: Number of dimensions
+    
+    Returns:
+        dict with best_x, best_f, avg_f, median_f, max_f
     """
-    name, fn, bounds, num_runs, neighbors_size = args
+    best_f = float('inf')
+    best_x = None
+    all_f = []
     
-    # Re-seed to ensure independence for this process
-    np.random.seed()
-    
-    print(f"Starting experiment for {name}...")
-    
-    best_f_overall = float('inf')
-    best_x_overall = None
-    all_best_fs = []
-
-    # Run the tabu search num_runs times sequentially within this process
     for _ in range(num_runs):
-        x0 = np.random.uniform(bounds[0], bounds[1], size=5)
-        best_x, best_f, _, _, _ = tabu_search(fn, x0, tenure=5, max_iter=1000, bounds=bounds, neighbors_size=neighbors_size)
-        all_best_fs.append(best_f)
-        if best_f < best_f_overall:
-            best_f_overall = best_f
-            best_x_overall = best_x
-
-    count_best = sum(1 for f in all_best_fs if np.isclose(f, best_f_overall))
-    global_min_rate = count_best / num_runs
-
-    avg_best_f = np.mean(all_best_fs)
-    median_best_f = np.median(all_best_fs)
-    max_best_f = np.max(all_best_fs)
-
-    # Format the result row here
-    row = [
-        name, 
-        "[" + ",\n".join(str(x) for x in best_x_overall) + "]", 
-        str(best_f_overall), 
-        str(avg_best_f), 
-        str(median_best_f), 
-        str(max_best_f),
-        f"{global_min_rate:.2f}"
-    ]
+        x0 = np.random.uniform(bounds[0], bounds[1], size=dims)
+        x, f, _, _, _ = tabu_search(fn, x0, tenure=tenure, max_iter=max_iter, 
+                                     bounds=bounds, neighbors_size=neighbors)
+        all_f.append(f)
+        if f < best_f:
+            best_f = f
+            best_x = x
     
-    print(f"Finished experiment for {name}.")
-    return row
-
-if __name__ == "__main__":
-    # Prepare arguments for each function
-    experiment_args = [(name, fn, BOUNDS, NUM_RUNS, NEIGHBORS_SIZE) for name, fn in funcs.items()]
-    
-    # Run experiments in parallel
-    # We use a max_workers equal to len(funcs) or let it default (usually num_cpus)
-    # Since we have 5 functions, we can process them all at once if we have 5+ cores.
-    with ProcessPoolExecutor() as executor:
-        results_data = list(executor.map(run_experiment, experiment_args))
-
-    with open("output.txt", "w") as f:
-        f.write("Tabu Search Experiment Results\n")
-        f.write("==============================\n\n")
-        f.write(f"Number of runs per function: {NUM_RUNS}\n\n")
-        
-        headers = ["Function", "Best x", "Best f(x)", "Avg Best f(x)", "Median Best f(x)", "Max Best f(x)", "Global Min Rate"]
-        table = tabulate(results_data, headers=headers, tablefmt="grid")
-        
-        f.write(table)
-
-    print("Results saved to output.txt")
+    return {
+        "best_x": best_x,
+        "best_f": best_f,
+        "avg_f": np.mean(all_f),
+        "median_f": np.median(all_f),
+        "max_f": np.max(all_f)
+    }
