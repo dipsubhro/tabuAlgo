@@ -5,21 +5,7 @@ import numpy as np
 
 
 def run_tabu(fn, num_runs=25, neighbors=10, tenure=5, max_iter=1000, bounds=(-5, 5), dims=5):
-    """
-    Run tabu search on a function multiple times.
     
-    Args:
-        fn: The objective function to minimize
-        num_runs: Number of runs
-        neighbors: Neighbors per iteration
-        tenure: Tabu tenure
-        max_iter: Max iterations
-        bounds: (min, max) tuple
-        dims: Number of dimensions
-    
-    Returns:
-        dict with best_x, best_f, avg_f, median_f, max_f
-    """
     best_f = float('inf')
     best_x = None
     all_f = []

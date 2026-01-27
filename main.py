@@ -4,7 +4,10 @@ Runs all functions concurrently for faster execution.
 """
 
 from run_tabu import run_tabu
-from func import *
+from func import (
+    sphere, sum_of_squares, zakharov, matyas, booth,
+    step, dixon_price, powell, bent_cigar, quartic
+)
 from concurrent.futures import ProcessPoolExecutor
 from tabulate import tabulate
 
@@ -20,20 +23,15 @@ def run_experiment(args):
 # Define all experiments: (name, fn, num_runs, neighbors, tenure, max_iter, bounds, dims)
 experiments = [
     ("Sphere", sphere, 20, 10, 5, 1000, (-5, 5), 5),
-    ("Rastrigin", rastrigin, 25, 15, 7, 1500, (-5, 5), 5),
-    ("Ackley", ackley, 22, 20, 5, 1000, (-5, 5), 5),
-    ("Rosenbrock", rosenbrock, 24, 15, 10, 2000, (-5, 5), 5),
-    ("Step", step, 20, 10, 3, 500, (-5, 5), 5),
-    ("Schwefel", schwefel, 25, 20, 8, 1500, (-500, 500), 5),
-    ("Griewank", griewank, 23, 15, 5, 1000, (-600, 600), 5),
-    ("Levy", levy, 21, 12, 6, 1000, (-10, 10), 5),
-    ("Zakharov", zakharov, 22, 10, 5, 800, (-5, 10), 5),
-    ("Bohachevsky", bohachevsky, 24, 15, 5, 1000, (-100, 100), 5),
-    ("Schaffer_N2", schaffer_n2, 25, 20, 7, 1200, (-100, 100), 5),
-    ("Matyas", matyas, 20, 10, 4, 500, (-10, 10), 5),
     ("Sum_of_Squares", sum_of_squares, 21, 10, 5, 600, (-10, 10), 5),
-    ("Trid", trid, 23, 15, 6, 1000, (-25, 25), 5),
+    ("Zakharov", zakharov, 22, 10, 5, 800, (-5, 10), 5),
+    ("Matyas", matyas, 20, 10, 4, 500, (-10, 10), 5),
     ("Booth", booth, 20, 10, 4, 500, (-10, 10), 5),
+    ("Step", step, 20, 10, 3, 500, (-5, 5), 5),
+    ("Dixon_Price", dixon_price, 23, 12, 5, 1000, (-10, 10), 5),
+    ("Powell", powell, 24, 15, 6, 1200, (-4, 5), 8),
+    ("Bent_Cigar", bent_cigar, 22, 15, 5, 1000, (-100, 100), 5),
+    ("Quartic", quartic, 20, 10, 4, 500, (-1.28, 1.28), 5),
 ]
 
 

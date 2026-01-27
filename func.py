@@ -125,3 +125,49 @@ def booth(x):
     """
     x1, x2 = x[0], x[1] if len(x) > 1 else 0
     return (x1 + 2*x2 - 7)**2 + (2*x1 + x2 - 5)**2
+
+
+def dixon_price(x):
+    """
+    Dixon-Price Function
+    Global minimum: f(x*) = 0
+    Search domain: [-10, 10]
+    """
+    n = len(x)
+    term1 = (x[0] - 1)**2
+    term2 = sum((i + 1) * (2 * x[i]**2 - x[i-1])**2 for i in range(1, n))
+    return term1 + term2
+
+
+def powell(x):
+    """
+    Powell Function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-4, 5]
+    """
+    n = len(x)
+    result = 0
+    for i in range(0, n - 3, 4):
+        result += (x[i] + 10*x[i+1])**2
+        result += 5 * (x[i+2] - x[i+3])**2
+        result += (x[i+1] - 2*x[i+2])**4
+        result += 10 * (x[i] - x[i+3])**4
+    return result
+
+
+def bent_cigar(x):
+    """
+    Bent Cigar Function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-100, 100]
+    """
+    return x[0]**2 + 1e6 * sum(xi**2 for xi in x[1:])
+
+
+def quartic(x):
+    """
+    Quartic Function (with noise)
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-1.28, 1.28]
+    """
+    return sum((i + 1) * xi**4 for i, xi in enumerate(x))
