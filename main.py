@@ -22,17 +22,37 @@ def run_experiment(args):
 
 
 # Define all experiments: (name, fn, num_runs, neighbors, tenure, max_iter, bounds, dims)
+# Parameters tuned for each function's characteristics
 experiments = [
-    ("Sphere", sphere, 20, 10, 5, 1000, (-5, 5), 5),
-    ("Sum_of_Squares", sum_of_squares, 21, 10, 5, 600, (-10, 10), 5),
-    ("Zakharov", zakharov, 22, 10, 5, 800, (-5, 10), 5),
-    ("Matyas", matyas, 20, 10, 4, 500, (-10, 10), 5),
-    ("Booth", booth, 20, 10, 4, 500, (-10, 10), 5),
+    # Sphere - simple unimodal, converges fast
+    ("Sphere", sphere, 25, 15, 5, 1500, (-5, 5), 5),
+    
+    # Sum_of_Squares - unimodal, similar to sphere
+    ("Sum_of_Squares", sum_of_squares, 25, 15, 5, 1000, (-10, 10), 5),
+    
+    # Zakharov - unimodal but harder, needs more exploration
+    ("Zakharov", zakharov, 25, 20, 6, 1500, (-5, 10), 5),
+    
+    # Matyas - 2D function, very easy
+    ("Matyas", matyas, 20, 10, 4, 800, (-10, 10), 2),
+    
+    # Booth - 2D function, optimal at (1,3)
+    ("Booth", booth, 20, 10, 4, 800, (-10, 10), 2),
+    
+    # Step - plateaus, already converges well
     ("Step", step, 20, 10, 3, 500, (-5, 5), 5),
-    ("Dixon_Price", dixon_price, 23, 12, 5, 1000, (-10, 10), 5),
-    ("Powell", powell, 24, 15, 6, 1200, (-4, 5), 8),
-    ("Bent_Cigar", bent_cigar, 22, 15, 5, 1000, (-100, 100), 5),
-    ("Quartic", quartic, 20, 10, 4, 500, (-1.28, 1.28), 5),
+    
+    # Dixon_Price - harder, needs more iterations and exploration
+    ("Dixon_Price", dixon_price, 25, 20, 7, 2000, (-10, 10), 5),
+    
+    # Powell - needs 4n dims, more neighbors for complex landscape
+    ("Powell", powell, 25, 25, 8, 2000, (-4, 5), 8),
+    
+    # Bent_Cigar - very ill-conditioned, smaller bounds help
+    ("Bent_Cigar", bent_cigar, 25, 30, 5, 2500, (-10, 10), 5),
+    
+    # Quartic - already performs well, small bounds
+    ("Quartic", quartic, 20, 15, 4, 800, (-1.28, 1.28), 5),
 ]
 
 
