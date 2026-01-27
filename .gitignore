@@ -52,7 +52,7 @@ Thumbs.db
 .env.*
 
 # Project-specific generated outputs
-output.txt
+# output.txt
 
 # Ignore Python bytecode and build artifacts just in case
 *.pyc
