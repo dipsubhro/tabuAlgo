@@ -10,6 +10,7 @@ from func import (
 )
 from concurrent.futures import ProcessPoolExecutor
 from tabulate import tabulate
+from visualize import visualize_results
 
 
 def run_experiment(args):
@@ -72,3 +73,6 @@ if __name__ == "__main__":
         f.write("\n")
     
     print("Done! Results saved to output.txt")
+    
+    # Generate visualization
+    visualize_results(results)
