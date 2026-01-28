@@ -24,5 +24,6 @@ def run_tabu(fn, num_runs=25, neighbors=10, tenure=5, max_iter=1000, bounds=(-5,
         "best_f": best_f,
         "avg_f": np.mean(all_f),
         "median_f": np.median(all_f),
-        "max_f": np.max(all_f)
+        "max_f": np.max(all_f),
+        "std_f": np.std(all_f)
     }

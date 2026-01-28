@@ -77,11 +77,12 @@ if __name__ == "__main__":
             f"{result['avg_f']:.4e}",
             f"{result['median_f']:.4e}",
             f"{result['max_f']:.4e}",
+            f"{result['std_f']:.4e}",
             best_x_str
         ])
     
     headers = ["Function", "Runs", "Neighbors", "Tenure", "MaxIter", "Bounds", "Dims", 
-               "Best f", "Avg f", "Median f", "Max f", "Best x"]
+               "Best f", "Avg f", "Median f", "Max f", "Std f", "Best x"]
     
     table = tabulate(table_rows, headers=headers, tablefmt="grid")
     
