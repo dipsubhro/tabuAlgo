@@ -10,7 +10,7 @@ from func import (
 )
 from concurrent.futures import ProcessPoolExecutor
 from tabulate import tabulate
-from visualize import visualize_results
+from visualize import visualize_results, create_unigraph
 
 
 def run_experiment(args):
@@ -97,3 +97,6 @@ if __name__ == "__main__":
     
     # Generate visualization
     visualize_results(results)
+    
+    # Generate unified comparison graph
+    create_unigraph(results)
