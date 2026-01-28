@@ -15,44 +15,50 @@ from visualize import visualize_results, create_unigraph
 
 def run_experiment(args):
     """Run a single experiment (called by each worker)."""
-    name, fn, num_runs, neighbors, tenure, max_iter, bounds, dims = args
+    name, fn, neighbors, tenure, max_iter, bounds, dims = args
     print(f"Running {name}...")
-    result = run_tabu(fn, num_runs, neighbors, tenure, max_iter, bounds, dims)
-    return (name, result, num_runs, neighbors, tenure, max_iter, bounds, dims)
+    result = run_tabu(fn, NUM_RUNS, neighbors, tenure, max_iter, bounds, dims)
+    return (name, result, NUM_RUNS, neighbors, tenure, max_iter, bounds, dims)
 
 
-# Define all experiments: (name, fn, num_runs, neighbors, tenure, max_iter, bounds, dims)
-# Parameters tuned for each function's characteristics
+# Define all experiments: (name, fn, neighbors, tenure, max_iter, bounds, dims)
+# FIXED: num_runs = 25 for all
+# FIXED: bounds = function-defined (standard domains)
+# FIXED: dims = 5 for general functions, 2 for 2D-only functions, 4 for Powell (min valid)
+# VARIABLE: Only neighbors, tenure, max_iter are tuned per function
+NUM_RUNS = 25
+STANDARD_DIMS = 5  # Standard dimension for fair comparison
+
 experiments = [
     # Sphere - simple unimodal, converges fast
-    ("Sphere", sphere, 25, 15, 5, 1500, (-5, 5), 5),
+    ("Sphere", sphere, 15, 5, 1500, (-5.12, 5.12), STANDARD_DIMS),
     
     # Sum_of_Squares - unimodal, similar to sphere
-    ("Sum_of_Squares", sum_of_squares, 25, 15, 5, 1000, (-10, 10), 5),
+    ("Sum_of_Squares", sum_of_squares, 15, 5, 1000, (-10, 10), STANDARD_DIMS),
     
     # Zakharov - unimodal but harder, needs more exploration
-    ("Zakharov", zakharov, 25, 20, 6, 1500, (-5, 10), 5),
+    ("Zakharov", zakharov, 20, 6, 1500, (-5, 10), STANDARD_DIMS),
     
-    # Matyas - 2D function, very easy
-    ("Matyas", matyas, 20, 10, 4, 800, (-10, 10), 2),
+    # Matyas - INHERENTLY 2D function (only defined for 2 vars)
+    ("Matyas", matyas, 10, 4, 800, (-10, 10), 2),
     
-    # Booth - 2D function, optimal at (1,3)
-    ("Booth", booth, 20, 10, 4, 800, (-10, 10), 2),
+    # Booth - INHERENTLY 2D function (only defined for 2 vars)
+    ("Booth", booth, 10, 4, 800, (-10, 10), 2),
     
-    # Step - plateaus, already converges well
-    ("Step", step, 20, 10, 3, 500, (-5, 5), 5),
+    # Step - plateaus, converges well
+    ("Step", step, 10, 3, 500, (-5.12, 5.12), STANDARD_DIMS),
     
-    # Dixon_Price - harder, needs more iterations and exploration
-    ("Dixon_Price", dixon_price, 25, 20, 7, 2000, (-10, 10), 5),
+    # Dixon_Price - harder, needs more iterations
+    ("Dixon_Price", dixon_price, 20, 7, 2000, (-10, 10), STANDARD_DIMS),
     
-    # Powell - needs 4n dims, more neighbors for complex landscape
-    ("Powell", powell, 25, 25, 8, 2000, (-4, 5), 8),
+    # Powell - requires dims to be multiple of 4 (using minimum: 4)
+    ("Powell", powell, 25, 8, 2000, (-4, 5), 4),
     
-    # Bent_Cigar - very ill-conditioned, smaller bounds help
-    ("Bent_Cigar", bent_cigar, 25, 30, 5, 2500, (-10, 10), 5),
+    # Bent_Cigar - very ill-conditioned
+    ("Bent_Cigar", bent_cigar, 30, 5, 2500, (-100, 100), STANDARD_DIMS),
     
-    # Quartic - already performs well, small bounds
-    ("Quartic", quartic, 20, 15, 4, 800, (-1.28, 1.28), 5),
+    # Quartic - performs well, small bounds
+    ("Quartic", quartic, 15, 4, 800, (-1.28, 1.28), STANDARD_DIMS),
 ]
 
 
