@@ -143,7 +143,7 @@ def create_unigraph(results):
     ax_main.set_yscale('symlog', linthresh=1e-12)
     ax_main.set_xlabel('Function (Ranked by Best Performance →)', fontsize=13, fontweight='bold')
     ax_main.set_ylabel('f(x) Value (Symmetric Log Scale)', fontsize=13, fontweight='bold')
-    ax_main.set_title('🏆 Tabu Search Performance Ranking', fontsize=18, fontweight='bold', pad=15)
+    ax_main.set_title('Tabu Search Performance Ranking', fontsize=18, fontweight='bold', pad=15)
     
     # Add rank labels on x-axis
     rank_labels = [f"#{i+1} {name}" for i, name in enumerate(names)]
@@ -162,7 +162,7 @@ def create_unigraph(results):
     ax_score.set_yticks(range(len(names)))
     ax_score.set_yticklabels([f"#{i+1}" for i in range(len(names))], fontsize=10)
     ax_score.set_xlabel('Performance Score', fontsize=11, fontweight='bold')
-    ax_score.set_title('📊 Score (0-100)', fontsize=14, fontweight='bold')
+    ax_score.set_title('Score (0-100)', fontsize=14, fontweight='bold')
     ax_score.set_xlim(0, 105)
     ax_score.invert_yaxis()
     
@@ -212,26 +212,26 @@ def create_unigraph(results):
             else:
                 table[(row, col)].set_facecolor('#f8fafc')  # Light gray
     
-    ax_table.set_title('📋 Detailed Statistics (Sorted by Performance)', fontsize=14, fontweight='bold', pad=10)
+    ax_table.set_title('Detailed Statistics (Sorted by Performance)', fontsize=14, fontweight='bold', pad=10)
     
     # Summary insights (bottom right)
     ax_insights = fig.add_subplot(gs[1, 2])
     ax_insights.axis('off')
     
     insights_text = f"""
-    🥇 Best Performer:
+    [1st] Best Performer:
        {names[0]}
        Best f(x) = {best_f[0]:.2e}
     
-    🥈 Runner Up:
+    [2nd] Runner Up:
        {names[1]}
        Best f(x) = {best_f[1]:.2e}
     
-    ⚠️ Needs Improvement:
+    [!] Needs Improvement:
        {names[-1]}
        Best f(x) = {max_f[-1]:.2e}
     
-    📈 Most Consistent:
+    [+] Most Consistent:
        {names[np.argmin(std_f)]}
        Std = {std_f.min():.2e}
     """
@@ -239,7 +239,7 @@ def create_unigraph(results):
     ax_insights.text(0.1, 0.95, insights_text, transform=ax_insights.transAxes,
                      fontsize=11, verticalalignment='top', fontfamily='monospace',
                      bbox=dict(boxstyle='round,pad=0.5', facecolor='#f0f9ff', edgecolor='#0284c7', alpha=0.9))
-    ax_insights.set_title('💡 Key Insights', fontsize=14, fontweight='bold')
+    ax_insights.set_title('Key Insights', fontsize=14, fontweight='bold')
     
     # Main title
     fig.suptitle('Unified Performance Analysis: Tabu Search Optimization', 

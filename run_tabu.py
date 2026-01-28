@@ -18,8 +18,8 @@ def run_tabu(fn, num_runs=25, neighbors=10, tenure=5, max_iter=1000, bounds=(-5,
     seed = initial_seed
     
     for run in range(num_runs):
-        # Set seed for reproducibility - seed doubles each run
-        np.random.seed(seed)
+        # Set seed for reproducibility - seed doubles each run (with wraparound)
+        np.random.seed(seed % (2**32))
         
         x0 = np.random.uniform(bounds[0], bounds[1], size=dims)
         x, f, _, _, _ = tabu_search(fn, x0, tenure=tenure, max_iter=max_iter, 
