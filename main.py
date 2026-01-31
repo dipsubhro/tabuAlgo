@@ -5,8 +5,9 @@ Runs all functions concurrently for faster execution.
 
 from run_tabu import run_tabu
 from func import (
-    sphere, sum_of_squares, zakharov, matyas, booth,
-    step, dixon_price, powell, bent_cigar, quartic
+    sphere, sum_of_squares, schwefel_222, step, rosenbrock,
+    rastrigin, ackley, griewank, levy, zakharov,
+    dixon_price, bent_cigar, high_conditioned_elliptic, alpine, salomon
 )
 from concurrent.futures import ProcessPoolExecutor
 from tabulate import tabulate
@@ -24,7 +25,7 @@ def run_experiment(args):
 # Define all experiments: (name, fn, neighbors, tenure, max_iter, bounds, dims)
 # FIXED: num_runs = 25 for all
 # FIXED: bounds = function-defined (standard domains)
-# FIXED: dims = 5 for general functions, 2 for 2D-only functions, 4 for Powell (min valid)
+# FIXED: dims = 5 for general functions
 # VARIABLE: Only neighbors, tenure, max_iter are tuned per function
 NUM_RUNS = 25
 STANDARD_DIMS = 5  # Standard dimension for fair comparison
@@ -36,29 +37,44 @@ experiments = [
     # Sum_of_Squares - unimodal, similar to sphere
     ("Sum_of_Squares", sum_of_squares, 15, 5, 1000, (-10, 10), STANDARD_DIMS),
     
-    # Zakharov - unimodal but harder, needs more exploration
-    ("Zakharov", zakharov, 20, 6, 1500, (-5, 10), STANDARD_DIMS),
-    
-    # Matyas - INHERENTLY 2D function (only defined for 2 vars)
-    ("Matyas", matyas, 10, 4, 800, (-10, 10), 2),
-    
-    # Booth - INHERENTLY 2D function (only defined for 2 vars)
-    ("Booth", booth, 10, 4, 800, (-10, 10), 2),
+    # Schwefel 2.22 - unimodal
+    ("Schwefel_2.22", schwefel_222, 20, 6, 1500, (-10, 10), STANDARD_DIMS),
     
     # Step - plateaus, converges well
-    ("Step", step, 10, 3, 500, (-5.12, 5.12), STANDARD_DIMS),
+    ("Step", step, 10, 3, 500, (-100, 100), STANDARD_DIMS),
     
-    # Dixon_Price - harder, needs more iterations
+    # Rosenbrock - valley-shaped, classic
+    ("Rosenbrock", rosenbrock, 25, 7, 2000, (-5, 10), STANDARD_DIMS),
+    
+    # Rastrigin - highly multimodal
+    ("Rastrigin", rastrigin, 30, 8, 2500, (-5.12, 5.12), STANDARD_DIMS),
+    
+    # Ackley - multimodal with many local minima
+    ("Ackley", ackley, 25, 7, 2000, (-32, 32), STANDARD_DIMS),
+    
+    # Griewank - multimodal
+    ("Griewank", griewank, 25, 6, 2000, (-600, 600), STANDARD_DIMS),
+    
+    # Lévy - CEC competition function
+    ("Levy", levy, 20, 6, 1500, (-10, 10), STANDARD_DIMS),
+    
+    # Zakharov - unimodal, bowl-shaped
+    ("Zakharov", zakharov, 20, 6, 1500, (-5, 10), STANDARD_DIMS),
+    
+    # Dixon-Price - non-separable
     ("Dixon_Price", dixon_price, 20, 7, 2000, (-10, 10), STANDARD_DIMS),
-    
-    # Powell - requires dims to be multiple of 4 (using minimum: 4)
-    ("Powell", powell, 25, 8, 2000, (-4, 5), 4),
     
     # Bent_Cigar - very ill-conditioned
     ("Bent_Cigar", bent_cigar, 30, 5, 2500, (-100, 100), STANDARD_DIMS),
     
-    # Quartic - performs well, small bounds
-    ("Quartic", quartic, 15, 4, 800, (-1.28, 1.28), STANDARD_DIMS),
+    # High-Conditioned Elliptic - ill-conditioned
+    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 30, 6, 2500, (-100, 100), STANDARD_DIMS),
+    
+    # Alpine - multimodal
+    ("Alpine", alpine, 20, 5, 1500, (-10, 10), STANDARD_DIMS),
+    
+    # Salomon - multimodal
+    ("Salomon", salomon, 25, 6, 2000, (-100, 100), STANDARD_DIMS),
 ]
 
 
@@ -67,11 +83,16 @@ if __name__ == "__main__":
     with ProcessPoolExecutor() as executor:
         results = list(executor.map(run_experiment, experiments))
     
-    # Build table rows
+    # Sort results by best_f to assign ranks
+    sorted_results = sorted(results, key=lambda x: x[1]['best_f'])
+    rank_map = {name: rank + 1 for rank, (name, *_) in enumerate(sorted_results)}
+    
+    # Build table rows (sorted by rank)
     table_rows = []
-    for name, result, num_runs, neighbors, tenure, max_iter, bounds, dims in results:
+    for name, result, num_runs, neighbors, tenure, max_iter, bounds, dims in sorted_results:
         best_x_str = "[" + ", ".join(f"{x:.4f}" for x in result['best_x']) + "]"
         table_rows.append([
+            rank_map[name],
             name,
             num_runs,
             neighbors,
@@ -87,7 +108,7 @@ if __name__ == "__main__":
             best_x_str
         ])
     
-    headers = ["Function", "Runs", "Neighbors", "Tenure", "MaxIter", "Bounds", "Dims", 
+    headers = ["Rank", "Function", "Runs", "Neighbors", "Tenure", "MaxIter", "Bounds", "Dims", 
                "Best f", "Avg f", "Median f", "Max f", "Std f", "Best x"]
     
     table = tabulate(table_rows, headers=headers, tablefmt="grid")

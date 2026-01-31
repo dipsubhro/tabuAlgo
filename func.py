@@ -1,33 +1,64 @@
 import math
 
 def sphere(x):
+    """
+    Sphere Function - Simple unimodal
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-5.12, 5.12]
+    """
     return sum(i**2 for i in x)
 
+def sum_of_squares(x):
+    """
+    Sum of Squares Function - Unimodal, easy baseline
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-10, 10]
+    """
+    return sum((i + 1) * xi**2 for i, xi in enumerate(x))
+
+def schwefel_222(x):
+    """
+    Schwefel 2.22 Function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-10, 10]
+    """
+    return sum(abs(xi) for xi in x) + math.prod(abs(xi) for xi in x)
+
+def step(x):
+    """
+    Step Function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-100, 100]
+    """
+    return sum(int(i)**2 for i in x)
+
+def rosenbrock(x):
+    """
+    Rosenbrock Function - Valley-shaped
+    Global minimum: f(1, ..., 1) = 0
+    Search domain: [-5, 10]
+    """
+    return sum(100 * (x[i+1] - x[i]**2)**2 + (1 - x[i])**2 for i in range(len(x)-1))
+
 def rastrigin(x):
+    """
+    Rastrigin Function - Highly multimodal
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-5.12, 5.12]
+    """
     n = len(x)
     return 10*n + sum(i**2 - 10*math.cos(2*math.pi*i) for i in x)
 
 def ackley(x):
+    """
+    Ackley Function - Multimodal with many local minima
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-32, 32]
+    """
     n = len(x)
     s1 = sum(i**2 for i in x)
     s2 = sum(math.cos(2*math.pi*i) for i in x)
     return -20 * math.exp(-0.2 * math.sqrt(s1 / n)) - math.exp(s2 / n) + 20 + math.e
-
-def rosenbrock(x):
-    return sum(100 * (x[i+1] - x[i]**2)**2 + (1 - x[i])**2 for i in range(len(x)-1))
-
-def step(x):
-    return sum(int(i)**2 for i in x)
-
-
-def schwefel(x):
-    """
-    Schwefel Function - Classic, highly multimodal
-    Global minimum: f(420.9687, ..., 420.9687) = 0
-    Search domain: [-500, 500]
-    """
-    n = len(x)
-    return 418.9829 * n - sum(xi * math.sin(math.sqrt(abs(xi))) for xi in x)
 
 def griewank(x):
     """
@@ -43,7 +74,7 @@ def griewank(x):
 
 def levy(x):
     """
-    Levy Function - Widely used in CEC competitions
+    Lévy Function - Widely used in CEC competitions
     Global minimum: f(1, ..., 1) = 0
     Search domain: [-10, 10]
     """
@@ -66,70 +97,9 @@ def zakharov(x):
     sum2 = sum(0.5 * (i + 1) * xi for i, xi in enumerate(x))
     return sum1 + sum2**2 + sum2**4
 
-def bohachevsky(x):
-    """
-    Bohachevsky Function - Classic CEC function
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-100, 100]
-    """
-    result = 0
-    for i in range(len(x) - 1):
-        result += x[i]**2 + 2*x[i+1]**2 - 0.3*math.cos(3*math.pi*x[i]) - 0.4*math.cos(4*math.pi*x[i+1]) + 0.7
-    return result
-
-def schaffer_n2(x):
-    """
-    Schaffer N.2 Function - Very popular, deceptive
-    Global minimum: f(0, 0) = 0
-    Search domain: [-100, 100]
-    Note: Uses first two dimensions for n-dimensional input
-    """
-    x1, x2 = x[0], x[1] if len(x) > 1 else 0
-    num = math.sin(x1**2 - x2**2)**2 - 0.5
-    den = (1 + 0.001 * (x1**2 + x2**2))**2
-    return 0.5 + num / den
-
-def matyas(x):
-    """
-    Matyas Function - Simple but effective test
-    Global minimum: f(0, 0) = 0
-    Search domain: [-10, 10]
-    """
-    x1, x2 = x[0], x[1] if len(x) > 1 else 0
-    return 0.26 * (x1**2 + x2**2) - 0.48 * x1 * x2
-
-def sum_of_squares(x):
-    """
-    Sum of Squares Function - Unimodal, easy baseline
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-10, 10]
-    """
-    return sum((i + 1) * xi**2 for i, xi in enumerate(x))
-
-def trid(x):
-    """
-    Trid Function - Non-separable unimodal
-    Global minimum: f* = -n(n+4)(n-1)/6 for optimal x
-    Search domain: [-n^2, n^2]
-    """
-    n = len(x)
-    sum1 = sum((xi - 1)**2 for xi in x)
-    sum2 = sum(x[i] * x[i-1] for i in range(1, n))
-    return sum1 - sum2
-
-def booth(x):
-    """
-    Booth Function - Classic optimization test
-    Global minimum: f(1, 3) = 0
-    Search domain: [-10, 10]
-    """
-    x1, x2 = x[0], x[1] if len(x) > 1 else 0
-    return (x1 + 2*x2 - 7)**2 + (2*x1 + x2 - 5)**2
-
-
 def dixon_price(x):
     """
-    Dixon-Price Function
+    Dixon–Price Function
     Global minimum: f(x*) = 0
     Search domain: [-10, 10]
     """
@@ -137,23 +107,6 @@ def dixon_price(x):
     term1 = (x[0] - 1)**2
     term2 = sum((i + 1) * (2 * x[i]**2 - x[i-1])**2 for i in range(1, n))
     return term1 + term2
-
-
-def powell(x):
-    """
-    Powell Function
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-4, 5]
-    """
-    n = len(x)
-    result = 0
-    for i in range(0, n - 3, 4):
-        result += (x[i] + 10*x[i+1])**2
-        result += 5 * (x[i+2] - x[i+3])**2
-        result += (x[i+1] - 2*x[i+2])**4
-        result += 10 * (x[i] - x[i+3])**4
-    return result
-
 
 def bent_cigar(x):
     """
@@ -163,11 +116,28 @@ def bent_cigar(x):
     """
     return x[0]**2 + 1e6 * sum(xi**2 for xi in x[1:])
 
-
-def quartic(x):
+def high_conditioned_elliptic(x):
     """
-    Quartic Function (with noise)
+    High-Conditioned Elliptic Function
     Global minimum: f(0, ..., 0) = 0
-    Search domain: [-1.28, 1.28]
+    Search domain: [-100, 100]
     """
-    return sum((i + 1) * xi**4 for i, xi in enumerate(x))
+    n = len(x)
+    return sum((1e6 ** ((i) / (n - 1))) * xi**2 for i, xi in enumerate(x))
+
+def alpine(x):
+    """
+    Alpine Function (Alpine N.1)
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-10, 10]
+    """
+    return sum(abs(xi * math.sin(xi) + 0.1 * xi) for xi in x)
+
+def salomon(x):
+    """
+    Salomon Function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-100, 100]
+    """
+    sum_sq = math.sqrt(sum(xi**2 for xi in x))
+    return 1 - math.cos(2 * math.pi * sum_sq) + 0.1 * sum_sq

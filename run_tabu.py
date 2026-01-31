@@ -13,13 +13,13 @@ def run_tabu(fn, num_runs=25, neighbors=10, tenure=5, max_iter=1000, bounds=(-5,
     best_x = None
     all_f = []
     
-    # Generate random initial seed (1 to 1000), then double it each run
+    # Generate random initial seed within valid 32-bit range
     initial_seed = np.random.randint(1, 1001)
-    seed = initial_seed
+    seed = 954777839  # Valid seed within 32-bit range
     
     for run in range(num_runs):
-        # Set seed for reproducibility - seed doubles each run (with wraparound)
-        np.random.seed(seed % (2**32))
+        # Set seed for reproducibility
+        np.random.seed(seed)
         
         x0 = np.random.uniform(bounds[0], bounds[1], size=dims)
         x, f, _, _, _ = tabu_search(fn, x0, tenure=tenure, max_iter=max_iter, 
@@ -29,8 +29,8 @@ def run_tabu(fn, num_runs=25, neighbors=10, tenure=5, max_iter=1000, bounds=(-5,
             best_f = f
             best_x = x
         
-        # Double the seed for next run
-        seed *= 2
+        # Increment seed for next run (avoids overflow)
+        seed += 12345
     
     return {
         "best_x": best_x,
