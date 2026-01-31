@@ -28,7 +28,7 @@ def step(x):
     """
     Step Function
     Global minimum: f(0, ..., 0) = 0
-    Search domain: [-100, 100]
+    Search domain: [-5.12, 5.12]
     """
     return sum(int(i)**2 for i in x)
 
@@ -39,53 +39,6 @@ def rosenbrock(x):
     Search domain: [-5, 10]
     """
     return sum(100 * (x[i+1] - x[i]**2)**2 + (1 - x[i])**2 for i in range(len(x)-1))
-
-def rastrigin(x):
-    """
-    Rastrigin Function - Highly multimodal
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-5.12, 5.12]
-    """
-    n = len(x)
-    return 10*n + sum(i**2 - 10*math.cos(2*math.pi*i) for i in x)
-
-def ackley(x):
-    """
-    Ackley Function - Multimodal with many local minima
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-32, 32]
-    """
-    n = len(x)
-    s1 = sum(i**2 for i in x)
-    s2 = sum(math.cos(2*math.pi*i) for i in x)
-    return -20 * math.exp(-0.2 * math.sqrt(s1 / n)) - math.exp(s2 / n) + 20 + math.e
-
-def griewank(x):
-    """
-    Griewank Function - Popular multimodal function
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-600, 600]
-    """
-    sum_sq = sum(xi**2 for xi in x)
-    prod_cos = 1
-    for i, xi in enumerate(x):
-        prod_cos *= math.cos(xi / math.sqrt(i + 1))
-    return 1 + sum_sq / 4000 - prod_cos
-
-def levy(x):
-    """
-    Lévy Function - Widely used in CEC competitions
-    Global minimum: f(1, ..., 1) = 0
-    Search domain: [-10, 10]
-    """
-    n = len(x)
-    w = [(xi - 1) / 4 + 1 for xi in x]
-    
-    term1 = math.sin(math.pi * w[0])**2
-    term2 = sum((w[i] - 1)**2 * (1 + 10 * math.sin(math.pi * w[i] + 1)**2) for i in range(n - 1))
-    term3 = (w[-1] - 1)**2 * (1 + math.sin(2 * math.pi * w[-1])**2)
-    
-    return term1 + term2 + term3
 
 def zakharov(x):
     """
@@ -133,11 +86,55 @@ def alpine(x):
     """
     return sum(abs(xi * math.sin(xi) + 0.1 * xi) for xi in x)
 
-def salomon(x):
+def powell(x):
     """
-    Salomon Function
+    Powell Function - Non-separable
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-4, 5]
+    Note: Works best with dims divisible by 4
+    """
+    n = len(x)
+    result = 0
+    for i in range(0, n - 3, 4):
+        result += (x[i] + 10*x[i+1])**2
+        result += 5 * (x[i+2] - x[i+3])**2
+        result += (x[i+1] - 2*x[i+2])**4
+        result += 10 * (x[i] - x[i+3])**4
+    return result
+
+def quartic(x):
+    """
+    Quartic Function (De Jong's F4)
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-1.28, 1.28]
+    """
+    return sum((i + 1) * xi**4 for i, xi in enumerate(x))
+
+def rotated_hyper_ellipsoid(x):
+    """
+    Rotated Hyper-Ellipsoid Function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-65.536, 65.536]
+    """
+    n = len(x)
+    result = 0
+    for i in range(n):
+        result += sum(x[j]**2 for j in range(i + 1))
+    return result
+
+def discus(x):
+    """
+    Discus (Tablet) Function
     Global minimum: f(0, ..., 0) = 0
     Search domain: [-100, 100]
     """
-    sum_sq = math.sqrt(sum(xi**2 for xi in x))
-    return 1 - math.cos(2 * math.pi * sum_sq) + 0.1 * sum_sq
+    return 1e6 * x[0]**2 + sum(xi**2 for xi in x[1:])
+
+def exponential(x):
+    """
+    Exponential Function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-1, 1]
+    """
+    return -math.exp(-0.5 * sum(xi**2 for xi in x)) + 1
+

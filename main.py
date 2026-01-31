@@ -6,8 +6,8 @@ Runs all functions concurrently for faster execution.
 from run_tabu import run_tabu
 from func import (
     sphere, sum_of_squares, schwefel_222, step, rosenbrock,
-    rastrigin, ackley, griewank, levy, zakharov,
-    dixon_price, bent_cigar, high_conditioned_elliptic, alpine, salomon
+    zakharov, dixon_price, bent_cigar, high_conditioned_elliptic, alpine,
+    powell, quartic, rotated_hyper_ellipsoid, discus, exponential
 )
 from concurrent.futures import ProcessPoolExecutor
 from tabulate import tabulate
@@ -31,56 +31,58 @@ NUM_RUNS = 25
 STANDARD_DIMS = 5  # Standard dimension for fair comparison
 
 experiments = [
-    # Sphere - simple unimodal, converges fast
-    ("Sphere", sphere, 20, 5, 2000, (-5.12, 5.12), STANDARD_DIMS),
+    # Sphere - simple unimodal
+    ("Sphere", sphere, 20, 5, 1000, (-5.12, 5.12), STANDARD_DIMS),
     
-    # Sum_of_Squares - unimodal, similar to sphere
-    ("Sum_of_Squares", sum_of_squares, 20, 5, 1500, (-10, 10), STANDARD_DIMS),
+    # Sum_of_Squares - unimodal
+    ("Sum_of_Squares", sum_of_squares, 20, 5, 1000, (-10, 10), STANDARD_DIMS),
     
     # Schwefel 2.22 - unimodal
-    ("Schwefel_2.22", schwefel_222, 25, 7, 2000, (-10, 10), STANDARD_DIMS),
+    ("Schwefel_2.22", schwefel_222, 25, 7, 1200, (-10, 10), STANDARD_DIMS),
     
-    # Step - HARD: discontinuous, needs many neighbors and high tenure
-    ("Step", step, 50, 15, 5000, (-5.12, 5.12), STANDARD_DIMS),  # Reduced bounds, more exploration
+    # Step - discontinuous
+    ("Step", step, 50, 15, 1500, (-5.12, 5.12), STANDARD_DIMS),
     
-    # Rosenbrock - valley-shaped, classic
-    ("Rosenbrock", rosenbrock, 30, 8, 3000, (-5, 10), STANDARD_DIMS),
-    
-    # Rastrigin - HARD: highly multimodal, needs aggressive exploration
-    ("Rastrigin", rastrigin, 50, 12, 5000, (-5.12, 5.12), STANDARD_DIMS),
-    
-    # Ackley - HARD: many local minima, reduced bounds help
-    ("Ackley", ackley, 50, 10, 5000, (-5, 5), STANDARD_DIMS),  # Reduced bounds from (-32, 32)
-    
-    # Griewank - HARD: multimodal, reduced bounds significantly
-    ("Griewank", griewank, 50, 12, 5000, (-100, 100), STANDARD_DIMS),  # Reduced from (-600, 600)
-    
-    # Lévy - HARD: deceptive, needs more exploration
-    ("Levy", levy, 40, 10, 4000, (-10, 10), STANDARD_DIMS),
+    # Rosenbrock - valley-shaped (optimal at x=1)
+    ("Rosenbrock", rosenbrock, 30, 8, 1500, (-5, 10), STANDARD_DIMS),
     
     # Zakharov - unimodal, bowl-shaped
-    ("Zakharov", zakharov, 25, 7, 2000, (-5, 10), STANDARD_DIMS),
+    ("Zakharov", zakharov, 25, 7, 1200, (-5, 10), STANDARD_DIMS),
     
     # Dixon-Price - non-separable
-    ("Dixon_Price", dixon_price, 30, 8, 3000, (-10, 10), STANDARD_DIMS),
+    ("Dixon_Price", dixon_price, 30, 8, 1500, (-10, 10), STANDARD_DIMS),
     
     # Bent_Cigar - very ill-conditioned
-    ("Bent_Cigar", bent_cigar, 40, 8, 4000, (-100, 100), STANDARD_DIMS),
+    ("Bent_Cigar", bent_cigar, 40, 8, 1500, (-100, 100), STANDARD_DIMS),
     
     # High-Conditioned Elliptic - ill-conditioned
-    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 40, 8, 4000, (-100, 100), STANDARD_DIMS),
+    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 40, 8, 1500, (-100, 100), STANDARD_DIMS),
     
-    # Alpine - multimodal
-    ("Alpine", alpine, 30, 8, 3000, (-10, 10), STANDARD_DIMS),
+    # Alpine - mildly multimodal
+    ("Alpine", alpine, 30, 8, 1500, (-10, 10), STANDARD_DIMS),
     
-    # Salomon - HARD: circular ridges, reduced bounds
-    ("Salomon", salomon, 50, 12, 5000, (-50, 50), STANDARD_DIMS),  # Reduced from (-100, 100)
+    # Powell - non-separable (dims=4)
+    ("Powell", powell, 30, 8, 1500, (-4, 5), 4),
+    
+    # Quartic - smooth unimodal
+    ("Quartic", quartic, 20, 5, 1000, (-1.28, 1.28), STANDARD_DIMS),
+    
+    # Rotated Hyper-Ellipsoid - non-separable
+    ("Rotated_Hyper_Ellipsoid", rotated_hyper_ellipsoid, 25, 7, 1200, (-65, 65), STANDARD_DIMS),
+    
+    # Discus - ill-conditioned
+    ("Discus", discus, 40, 8, 1500, (-100, 100), STANDARD_DIMS),
+    
+    # Exponential - smooth unimodal
+    ("Exponential", exponential, 20, 5, 1000, (-1, 1), STANDARD_DIMS),
 ]
 
 
 if __name__ == "__main__":
-    # Run all experiments concurrently
-    with ProcessPoolExecutor() as executor:
+    # Run all experiments concurrently (leave 2 cores free)
+    import os
+    max_workers = max(1, os.cpu_count() - 2)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         results = list(executor.map(run_experiment, experiments))
     
     # Sort results by best_f to assign ranks
