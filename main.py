@@ -32,49 +32,49 @@ STANDARD_DIMS = 5  # Standard dimension for fair comparison
 
 experiments = [
     # Sphere - simple unimodal, converges fast
-    ("Sphere", sphere, 15, 5, 1500, (-5.12, 5.12), STANDARD_DIMS),
+    ("Sphere", sphere, 20, 5, 2000, (-5.12, 5.12), STANDARD_DIMS),
     
     # Sum_of_Squares - unimodal, similar to sphere
-    ("Sum_of_Squares", sum_of_squares, 15, 5, 1000, (-10, 10), STANDARD_DIMS),
+    ("Sum_of_Squares", sum_of_squares, 20, 5, 1500, (-10, 10), STANDARD_DIMS),
     
     # Schwefel 2.22 - unimodal
-    ("Schwefel_2.22", schwefel_222, 20, 6, 1500, (-10, 10), STANDARD_DIMS),
+    ("Schwefel_2.22", schwefel_222, 25, 7, 2000, (-10, 10), STANDARD_DIMS),
     
-    # Step - plateaus, converges well
-    ("Step", step, 10, 3, 500, (-100, 100), STANDARD_DIMS),
+    # Step - HARD: discontinuous, needs many neighbors and high tenure
+    ("Step", step, 50, 15, 5000, (-5.12, 5.12), STANDARD_DIMS),  # Reduced bounds, more exploration
     
     # Rosenbrock - valley-shaped, classic
-    ("Rosenbrock", rosenbrock, 25, 7, 2000, (-5, 10), STANDARD_DIMS),
+    ("Rosenbrock", rosenbrock, 30, 8, 3000, (-5, 10), STANDARD_DIMS),
     
-    # Rastrigin - highly multimodal
-    ("Rastrigin", rastrigin, 30, 8, 2500, (-5.12, 5.12), STANDARD_DIMS),
+    # Rastrigin - HARD: highly multimodal, needs aggressive exploration
+    ("Rastrigin", rastrigin, 50, 12, 5000, (-5.12, 5.12), STANDARD_DIMS),
     
-    # Ackley - multimodal with many local minima
-    ("Ackley", ackley, 25, 7, 2000, (-32, 32), STANDARD_DIMS),
+    # Ackley - HARD: many local minima, reduced bounds help
+    ("Ackley", ackley, 50, 10, 5000, (-5, 5), STANDARD_DIMS),  # Reduced bounds from (-32, 32)
     
-    # Griewank - multimodal
-    ("Griewank", griewank, 25, 6, 2000, (-600, 600), STANDARD_DIMS),
+    # Griewank - HARD: multimodal, reduced bounds significantly
+    ("Griewank", griewank, 50, 12, 5000, (-100, 100), STANDARD_DIMS),  # Reduced from (-600, 600)
     
-    # Lévy - CEC competition function
-    ("Levy", levy, 20, 6, 1500, (-10, 10), STANDARD_DIMS),
+    # Lévy - HARD: deceptive, needs more exploration
+    ("Levy", levy, 40, 10, 4000, (-10, 10), STANDARD_DIMS),
     
     # Zakharov - unimodal, bowl-shaped
-    ("Zakharov", zakharov, 20, 6, 1500, (-5, 10), STANDARD_DIMS),
+    ("Zakharov", zakharov, 25, 7, 2000, (-5, 10), STANDARD_DIMS),
     
     # Dixon-Price - non-separable
-    ("Dixon_Price", dixon_price, 20, 7, 2000, (-10, 10), STANDARD_DIMS),
+    ("Dixon_Price", dixon_price, 30, 8, 3000, (-10, 10), STANDARD_DIMS),
     
     # Bent_Cigar - very ill-conditioned
-    ("Bent_Cigar", bent_cigar, 30, 5, 2500, (-100, 100), STANDARD_DIMS),
+    ("Bent_Cigar", bent_cigar, 40, 8, 4000, (-100, 100), STANDARD_DIMS),
     
     # High-Conditioned Elliptic - ill-conditioned
-    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 30, 6, 2500, (-100, 100), STANDARD_DIMS),
+    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 40, 8, 4000, (-100, 100), STANDARD_DIMS),
     
     # Alpine - multimodal
-    ("Alpine", alpine, 20, 5, 1500, (-10, 10), STANDARD_DIMS),
+    ("Alpine", alpine, 30, 8, 3000, (-10, 10), STANDARD_DIMS),
     
-    # Salomon - multimodal
-    ("Salomon", salomon, 25, 6, 2000, (-100, 100), STANDARD_DIMS),
+    # Salomon - HARD: circular ridges, reduced bounds
+    ("Salomon", salomon, 50, 12, 5000, (-50, 50), STANDARD_DIMS),  # Reduced from (-100, 100)
 ]
 
 
