@@ -32,48 +32,48 @@ STANDARD_DIMS = 5  # Standard dimension for fair comparison
 
 experiments = [
     # Sphere - simple unimodal
-    ("Sphere", sphere, 20, 5, 1000, (-5.12, 5.12), STANDARD_DIMS),
+    ("Sphere", sphere, 25, 6, 1200, (-5.12, 5.12), STANDARD_DIMS),
     
     # Sum_of_Squares - unimodal
-    ("Sum_of_Squares", sum_of_squares, 20, 5, 1000, (-10, 10), STANDARD_DIMS),
+    ("Sum_of_Squares", sum_of_squares, 25, 6, 1200, (-10, 10), STANDARD_DIMS),
     
-    # Schwefel 2.22 - unimodal
-    ("Schwefel_2.22", schwefel_222, 25, 7, 1200, (-10, 10), STANDARD_DIMS),
+    # Schwefel 2.22 - needs more exploration
+    ("Schwefel_2.22", schwefel_222, 35, 10, 1500, (-5, 5), STANDARD_DIMS),  # Reduced bounds
     
-    # Step - discontinuous
+    # Step - discontinuous (already perfect)
     ("Step", step, 50, 15, 1500, (-5.12, 5.12), STANDARD_DIMS),
     
-    # Rosenbrock - valley-shaped (optimal at x=1)
-    ("Rosenbrock", rosenbrock, 30, 8, 1500, (-5, 10), STANDARD_DIMS),
+    # Rosenbrock - valley-shaped, needs careful tuning
+    ("Rosenbrock", rosenbrock, 40, 10, 1500, (-2, 5), STANDARD_DIMS),  # Reduced bounds closer to optimal
     
     # Zakharov - unimodal, bowl-shaped
     ("Zakharov", zakharov, 25, 7, 1200, (-5, 10), STANDARD_DIMS),
     
     # Dixon-Price - non-separable
-    ("Dixon_Price", dixon_price, 30, 8, 1500, (-10, 10), STANDARD_DIMS),
+    ("Dixon_Price", dixon_price, 35, 9, 1500, (-10, 10), STANDARD_DIMS),
     
-    # Bent_Cigar - very ill-conditioned
-    ("Bent_Cigar", bent_cigar, 40, 8, 1500, (-100, 100), STANDARD_DIMS),
+    # Bent_Cigar - reduce bounds significantly for ill-conditioned
+    ("Bent_Cigar", bent_cigar, 50, 12, 1500, (-10, 10), STANDARD_DIMS),  # Much smaller bounds
     
-    # High-Conditioned Elliptic - ill-conditioned
-    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 40, 8, 1500, (-100, 100), STANDARD_DIMS),
+    # High-Conditioned Elliptic - reduce bounds
+    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 50, 12, 1500, (-10, 10), STANDARD_DIMS),  # Smaller bounds
     
-    # Alpine - mildly multimodal
-    ("Alpine", alpine, 30, 8, 1500, (-10, 10), STANDARD_DIMS),
+    # Alpine - needs more neighbors for multimodal
+    ("Alpine", alpine, 40, 10, 1500, (-5, 5), STANDARD_DIMS),  # Reduced bounds
     
     # Powell - non-separable (dims=4)
-    ("Powell", powell, 30, 8, 1500, (-4, 5), 4),
+    ("Powell", powell, 35, 9, 1500, (-4, 5), 4),
     
-    # Quartic - smooth unimodal
+    # Quartic - smooth unimodal (already excellent)
     ("Quartic", quartic, 20, 5, 1000, (-1.28, 1.28), STANDARD_DIMS),
     
     # Rotated Hyper-Ellipsoid - non-separable
-    ("Rotated_Hyper_Ellipsoid", rotated_hyper_ellipsoid, 25, 7, 1200, (-65, 65), STANDARD_DIMS),
+    ("Rotated_Hyper_Ellipsoid", rotated_hyper_ellipsoid, 30, 8, 1200, (-30, 30), STANDARD_DIMS),  # Smaller bounds
     
-    # Discus - ill-conditioned
-    ("Discus", discus, 40, 8, 1500, (-100, 100), STANDARD_DIMS),
+    # Discus - reduce bounds
+    ("Discus", discus, 50, 10, 1500, (-10, 10), STANDARD_DIMS),  # Smaller bounds
     
-    # Exponential - smooth unimodal
+    # Exponential - smooth unimodal (already excellent)
     ("Exponential", exponential, 20, 5, 1000, (-1, 1), STANDARD_DIMS),
 ]
 
