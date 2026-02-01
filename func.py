@@ -16,13 +16,13 @@ def sum_of_squares(x):
     """
     return sum((i + 1) * xi**2 for i, xi in enumerate(x))
 
-def schwefel_222(x):
+def sum_of_different_powers(x):
     """
-    Schwefel 2.22 Function
+    Sum of Different Powers Function - Very easy
     Global minimum: f(0, ..., 0) = 0
-    Search domain: [-10, 10]
+    Search domain: [-1, 1]
     """
-    return sum(abs(xi) for xi in x) + math.prod(abs(xi) for xi in x)
+    return sum(abs(xi) ** (i + 2) for i, xi in enumerate(x))
 
 def step(x):
     """
@@ -32,13 +32,14 @@ def step(x):
     """
     return sum(int(i)**2 for i in x)
 
-def rosenbrock(x):
+def brown(x):
     """
-    Rosenbrock Function - Valley-shaped
-    Global minimum: f(1, ..., 1) = 0
-    Search domain: [-5, 10]
+    Brown Function - Smooth unimodal
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-1, 4]
     """
-    return sum(100 * (x[i+1] - x[i]**2)**2 + (1 - x[i])**2 for i in range(len(x)-1))
+    n = len(x)
+    return sum((x[i]**2) ** (x[i+1]**2 + 1) + (x[i+1]**2) ** (x[i]**2 + 1) for i in range(n - 1))
 
 def zakharov(x):
     """
@@ -61,30 +62,29 @@ def dixon_price(x):
     term2 = sum((i + 1) * (2 * x[i]**2 - x[i-1])**2 for i in range(1, n))
     return term1 + term2
 
-def bent_cigar(x):
+def schumer_steiglitz(x):
     """
-    Bent Cigar Function
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-100, 100]
-    """
-    return x[0]**2 + 1e6 * sum(xi**2 for xi in x[1:])
-
-def high_conditioned_elliptic(x):
-    """
-    High-Conditioned Elliptic Function
-    Global minimum: f(0, ..., 0) = 0
-    Search domain: [-100, 100]
-    """
-    n = len(x)
-    return sum((1e6 ** ((i) / (n - 1))) * xi**2 for i, xi in enumerate(x))
-
-def alpine(x):
-    """
-    Alpine Function (Alpine N.1)
+    Schumer Steiglitz Function - Sum of fourth powers
     Global minimum: f(0, ..., 0) = 0
     Search domain: [-10, 10]
     """
-    return sum(abs(xi * math.sin(xi) + 0.1 * xi) for xi in x)
+    return sum(xi**4 for xi in x)
+
+def csendes(x):
+    """
+    Csendes Function - Simple smooth function
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-1, 1]
+    """
+    return sum(xi**6 * (2 + math.sin(1 / (xi + 1e-10))) for xi in x)
+
+def sixth_power(x):
+    """
+    Sixth Power Function - Smooth, similar to Csendes
+    Global minimum: f(0, ..., 0) = 0
+    Search domain: [-1, 1]
+    """
+    return sum(xi**6 for xi in x)
 
 def powell(x):
     """

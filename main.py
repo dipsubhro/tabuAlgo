@@ -5,8 +5,8 @@ Runs all functions concurrently for faster execution.
 
 from run_tabu import run_tabu
 from func import (
-    sphere, sum_of_squares, schwefel_222, step, rosenbrock,
-    zakharov, dixon_price, bent_cigar, high_conditioned_elliptic, alpine,
+    sphere, sum_of_squares, sum_of_different_powers, step, brown,
+    zakharov, dixon_price, schumer_steiglitz, csendes, sixth_power,
     powell, quartic, rotated_hyper_ellipsoid, discus, exponential
 )
 from concurrent.futures import ProcessPoolExecutor
@@ -38,13 +38,13 @@ experiments = [
     ("Sum_of_Squares", sum_of_squares, 25, 6, 1200, (-10, 10), STANDARD_DIMS),
     
     # Schwefel 2.22 - needs more exploration
-    ("Schwefel_2.22", schwefel_222, 35, 10, 1500, (-5, 5), STANDARD_DIMS),  # Reduced bounds
+    ("Sum_of_Different_Powers", sum_of_different_powers, 25, 6, 1200, (-1, 1), STANDARD_DIMS),
     
     # Step - discontinuous (already perfect)
     ("Step", step, 50, 15, 1500, (-5.12, 5.12), STANDARD_DIMS),
     
-    # Rosenbrock - valley-shaped, needs careful tuning
-    ("Rosenbrock", rosenbrock, 40, 10, 1500, (-2, 5), STANDARD_DIMS),  # Reduced bounds closer to optimal
+    # Brown - smooth unimodal
+    ("Brown", brown, 25, 6, 1200, (-1, 4), STANDARD_DIMS),
     
     # Zakharov - unimodal, bowl-shaped
     ("Zakharov", zakharov, 25, 7, 1200, (-5, 10), STANDARD_DIMS),
@@ -52,14 +52,14 @@ experiments = [
     # Dixon-Price - non-separable
     ("Dixon_Price", dixon_price, 35, 9, 1500, (-10, 10), STANDARD_DIMS),
     
-    # Bent_Cigar - reduce bounds significantly for ill-conditioned
-    ("Bent_Cigar", bent_cigar, 50, 12, 1500, (-10, 10), STANDARD_DIMS),  # Much smaller bounds
+    # Schumer_Steiglitz - sum of fourth powers
+    ("Schumer_Steiglitz", schumer_steiglitz, 25, 6, 1200, (-10, 10), STANDARD_DIMS),
     
-    # High-Conditioned Elliptic - reduce bounds
-    ("High_Conditioned_Elliptic", high_conditioned_elliptic, 50, 12, 1500, (-10, 10), STANDARD_DIMS),  # Smaller bounds
+    # Csendes - smooth function
+    ("Csendes", csendes, 25, 6, 1200, (-1, 1), STANDARD_DIMS),
     
-    # Alpine - needs more neighbors for multimodal
-    ("Alpine", alpine, 40, 10, 1500, (-5, 5), STANDARD_DIMS),  # Reduced bounds
+    # Sixth Power - smooth like Csendes
+    ("Sixth_Power", sixth_power, 25, 6, 1200, (-1, 1), STANDARD_DIMS),
     
     # Powell - non-separable (dims=4)
     ("Powell", powell, 35, 9, 1500, (-4, 5), 4),
