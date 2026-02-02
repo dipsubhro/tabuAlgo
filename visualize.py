@@ -7,6 +7,80 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def create_convergence_curves(results):
+    """
+    Create a convergence curve graph similar to the PSO reference.
+    Plots best cost (log scale) vs iteration for all functions.
+    """
+    # Set up figure
+    fig, ax = plt.subplots(figsize=(14, 10))
+    
+    # Color palette - distinct colors for each function
+    colors = [
+        '#1f77b4',  # Blue
+        '#ff7f0e',  # Orange  
+        '#2ca02c',  # Green
+        '#d62728',  # Red
+        '#9467bd',  # Purple
+        '#8c564b',  # Brown
+        '#e377c2',  # Pink
+        '#7f7f7f',  # Gray
+        '#bcbd22',  # Yellow-green
+        '#17becf',  # Cyan
+        '#aec7e8',  # Light blue
+        '#ffbb78',  # Light orange
+        '#98df8a',  # Light green
+        '#ff9896',  # Light red
+        '#c5b0d5',  # Light purple
+    ]
+    
+    # Extract and plot convergence history for each function
+    max_iter = 0
+    for idx, (name, result, *_) in enumerate(results):
+        history = result.get('convergence_history', [])
+        if len(history) > max_iter:
+            max_iter = len(history)
+        
+        if len(history) > 0:
+            iterations = range(len(history))
+            # Add small epsilon to avoid log(0)
+            history_safe = [max(h, 1e-150) for h in history]
+            ax.plot(iterations, history_safe, 
+                   color=colors[idx % len(colors)], 
+                   linewidth=2,
+                   label=name.replace('_', ' '))
+    
+    # Set log scale for y-axis
+    ax.set_yscale('log')
+    
+    # Add vertical dashed lines at 40% and 100% of max iterations (like the reference)
+    if max_iter > 0:
+        ax.axvline(x=int(max_iter * 0.4), color='red', linestyle='--', linewidth=1, alpha=0.7)
+        ax.axvline(x=max_iter - 1, color='red', linestyle='--', linewidth=1, alpha=0.7)
+    
+    # Labels and title
+    ax.set_xlabel('Iteration', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Best Cost (Log Scale)', fontsize=12, fontweight='bold')
+    ax.set_title('Tabu Search Convergence Curves (D=5, N=40)', fontsize=14, fontweight='bold')
+    
+    # Legend outside on the right
+    ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), 
+              fontsize=10, framealpha=0.95, borderaxespad=0)
+    
+    # Grid
+    ax.grid(True, alpha=0.3, which='both')
+    ax.set_axisbelow(True)
+    
+    # Adjust layout to accommodate legend
+    plt.tight_layout()
+    fig.subplots_adjust(right=0.78)
+    
+    # Save
+    plt.savefig('convergence_curves.png', dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+    print("Convergence curves saved to convergence_curves.png")
+
+
 def visualize_results(results):
     """
     Create and save visualization charts.

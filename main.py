@@ -11,7 +11,7 @@ from func import (
 )
 from concurrent.futures import ProcessPoolExecutor
 from tabulate import tabulate
-from visualize import visualize_results, create_unigraph
+from visualize import visualize_results, create_unigraph, create_convergence_curves
 
 
 def run_experiment(args):
@@ -31,50 +31,50 @@ NUM_RUNS = 25
 STANDARD_DIMS = 5  # Standard dimension for fair comparison
 
 experiments = [
-    # Sphere - simple unimodal
-    ("Sphere", sphere, 25, 6, 1200, (-5.12, 5.12), STANDARD_DIMS),
+    # Sphere - simple unimodal (increased iters for fine tuning)
+    ("Sphere", sphere, 40, 8, 2000, (-5.12, 5.12), STANDARD_DIMS),
     
-    # Sum_of_Squares - unimodal
-    ("Sum_of_Squares", sum_of_squares, 25, 6, 1200, (-10, 10), STANDARD_DIMS),
+    # Sum_of_Squares - unimodal (wider search space needs more exploration)
+    ("Sum_of_Squares", sum_of_squares, 40, 8, 2000, (-10, 10), STANDARD_DIMS),
     
-    # Schwefel 2.22 - needs more exploration
-    ("Sum_of_Different_Powers", sum_of_different_powers, 25, 6, 1200, (-1, 1), STANDARD_DIMS),
+    # Sum_of_Different_Powers - tight bounds, needs fine control
+    ("Sum_of_Different_Powers", sum_of_different_powers, 40, 8, 2000, (-1, 1), STANDARD_DIMS),
     
-    # Step - discontinuous (already perfect)
-    ("Step", step, 50, 15, 1500, (-5.12, 5.12), STANDARD_DIMS),
+    # Step - discontinuous (more neighbors for plateau navigation)
+    ("Step", step, 60, 12, 2000, (-5.12, 5.12), STANDARD_DIMS),
     
     # Brown - smooth unimodal
-    ("Brown", brown, 25, 6, 1200, (-1, 4), STANDARD_DIMS),
+    ("Brown", brown, 40, 8, 2000, (-1, 4), STANDARD_DIMS),
     
-    # Zakharov - unimodal, bowl-shaped
-    ("Zakharov", zakharov, 25, 7, 1200, (-5, 10), STANDARD_DIMS),
+    # Zakharov - unimodal, bowl-shaped (harder function)
+    ("Zakharov", zakharov, 50, 10, 2500, (-5, 10), STANDARD_DIMS),
     
-    # Dixon-Price - non-separable
-    ("Dixon_Price", dixon_price, 35, 9, 1500, (-10, 10), STANDARD_DIMS),
+    # Dixon-Price - non-separable (challenging, needs more resources)
+    ("Dixon_Price", dixon_price, 60, 12, 3000, (-10, 10), STANDARD_DIMS),
     
     # Schumer_Steiglitz - sum of fourth powers
-    ("Schumer_Steiglitz", schumer_steiglitz, 25, 6, 1200, (-10, 10), STANDARD_DIMS),
+    ("Schumer_Steiglitz", schumer_steiglitz, 40, 8, 2000, (-10, 10), STANDARD_DIMS),
     
-    # Csendes - smooth function
-    ("Csendes", csendes, 25, 6, 1200, (-1, 1), STANDARD_DIMS),
+    # Csendes - smooth function (tight bounds)
+    ("Csendes", csendes, 40, 8, 2000, (-1, 1), STANDARD_DIMS),
     
     # Sixth Power - smooth like Csendes
-    ("Sixth_Power", sixth_power, 25, 6, 1200, (-1, 1), STANDARD_DIMS),
+    ("Sixth_Power", sixth_power, 40, 8, 2000, (-1, 1), STANDARD_DIMS),
     
-    # Powell - non-separable (dims=4)
-    ("Powell", powell, 35, 9, 1500, (-4, 5), 4),
+    # Powell - non-separable (dims=4, complex landscape)
+    ("Powell", powell, 50, 10, 2500, (-4, 5), 4),
     
-    # Quartic - smooth unimodal (already excellent)
-    ("Quartic", quartic, 20, 5, 1000, (-1.28, 1.28), STANDARD_DIMS),
+    # Quartic - smooth unimodal
+    ("Quartic", quartic, 35, 7, 1500, (-1.28, 1.28), STANDARD_DIMS),
     
-    # Rotated Hyper-Ellipsoid - non-separable
-    ("Rotated_Hyper_Ellipsoid", rotated_hyper_ellipsoid, 30, 8, 1200, (-30, 30), STANDARD_DIMS),  # Smaller bounds
+    # Rotated Hyper-Ellipsoid - non-separable (tighter bounds for better focus)
+    ("Rotated_Hyper_Ellipsoid", rotated_hyper_ellipsoid, 50, 10, 2500, (-30, 30), STANDARD_DIMS),
     
-    # Discus - reduce bounds
-    ("Discus", discus, 50, 10, 1500, (-10, 10), STANDARD_DIMS),  # Smaller bounds
+    # Discus - ill-conditioned (needs more exploration)
+    ("Discus", discus, 60, 12, 3000, (-10, 10), STANDARD_DIMS),
     
-    # Exponential - smooth unimodal (already excellent)
-    ("Exponential", exponential, 20, 5, 1000, (-1, 1), STANDARD_DIMS),
+    # Exponential - smooth unimodal
+    ("Exponential", exponential, 35, 7, 1500, (-1, 1), STANDARD_DIMS),
 ]
 
 
@@ -129,3 +129,6 @@ if __name__ == "__main__":
     
     # Generate unified comparison graph
     create_unigraph(results)
+    
+    # Generate convergence curves like the PSO reference
+    create_convergence_curves(results)
