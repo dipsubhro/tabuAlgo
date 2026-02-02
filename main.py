@@ -27,7 +27,7 @@ def run_experiment(args):
 # FIXED: bounds = function-defined (standard domains)
 # FIXED: dims = 5 for general functions
 # VARIABLE: Only neighbors, tenure, max_iter are tuned per function
-NUM_RUNS = 25
+NUM_RUNS = 30
 STANDARD_DIMS = 5  # Standard dimension for fair comparison
 
 experiments = [
