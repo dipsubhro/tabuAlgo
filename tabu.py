@@ -100,6 +100,10 @@ def tabu_search(func, x0, tenure=7, max_iter=100, bounds=None, neighbors_size=20
             
             neighbors.append((new_solution, new_objective_value, position_hash))
         
+        # Shuffle neighbors to break ties randomly (helps avoid local minima)
+        # Since sort is stable, this ensures random selection among equal best values
+        np.random.shuffle(neighbors)
+
         # Sort by objective value (minimization)
         neighbors.sort(key=lambda t: t[1])
         
