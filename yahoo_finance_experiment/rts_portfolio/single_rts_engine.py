@@ -24,7 +24,6 @@ from .fitness import (
     calc_annual_return,
     calc_annual_risk,
     sharpe_ratio,
-    calc_all_metrics,
     repair_weights_2d,
     repair_weights_capped_2d,
     sharpe_ratio_2d,
@@ -59,7 +58,7 @@ def levy_flight(size, beta=1.5):
 # MAIN RTS CLASS
 # ═══════════════════════════════════════════════════════════════════════════
 
-class ReactiveTabuSearch:
+class SingleReactiveTabuSearch:
     """
     Reactive Tabu Search for portfolio weight optimisation.
 
@@ -98,7 +97,6 @@ class ReactiveTabuSearch:
         n_assets,
         rf=0.02,
         max_iter=5000,
-        swarm_size=10,
         neighbors_size=50,
         initial_tenure=10,
         weight_cap=0.10,
@@ -113,7 +111,6 @@ class ReactiveTabuSearch:
         self.n_assets = n_assets
         self.rf = rf
         self.max_iter = max_iter
-        self.swarm_size = swarm_size
         self.neighbors_size = neighbors_size
         self.initial_tenure = initial_tenure
         self.weight_cap = weight_cap
@@ -175,146 +172,185 @@ class ReactiveTabuSearch:
     # -------------------------------------------------------------------
     def run(self):
         """
-        Execute the Multi-Solution Swarm Reactive Tabu Search.
+        Execute the Reactive Tabu Search.
+
+        Returns
+        -------
+        dict with keys:
+            best_weights, best_sharpe, best_return, best_risk,
+            convergence_log, all_explored
         """
         if self.seed is not None:
             np.random.seed(self.seed)
 
-        # ── Initialise Swarm ──────────────────────────────────────────────
-        current_swarm = np.random.uniform(0, 1, (self.swarm_size, self.n_assets))
-        current_swarm = repair_weights_2d(current_swarm)
-        
-        init_s, init_rets, init_risks = sharpe_ratio_2d(
-            current_swarm, self.returns_data, self.cov_matrix, self.rf
+        # ── Initialise ──────────────────────────────────────────────
+        current = repair_weights(
+            np.random.uniform(0, 1, self.n_assets)
         )
+        current_sharpe = self._sharpe(current)
 
-        best_idx = np.argmax(init_s)
-        best_weights = current_swarm[best_idx].copy()
-        best_sharpe = init_s[best_idx]
+        best_weights = current.copy()
+        best_sharpe = current_sharpe
 
-        # Global Memory
-        tabu_list = {}
+        # Tabu list: deque of hashes
+        tabu_list = deque(maxlen=self.max_tenure * 3)
+
+        # Module B: visit frequency for cycle detection
         visit_count = defaultdict(int)
         tenure = self.initial_tenure
 
+        # Step scale: starts large, decays (but Lévy still allows long jumps)
         step_scale = 0.15
+        min_step_scale = 0.005
         step_decay = 0.9995
 
-        convergence_log = []
-        all_explored = []
-        for i in range(self.swarm_size):
-            all_explored.append((init_risks[i], init_rets[i], init_s[i]))
-
+        # Tracking
+        convergence_log = []          # (iter, best_sharpe, current_sharpe, tenure, phase)
+        all_explored = []             # list of (risk, return) for Pareto plot
         iters_without_improvement = 0
         stagnation_threshold = max(100, self.max_iter // 10)
+        diversification_count = 0
+        max_diversifications = 8
 
         for iteration in range(self.max_iter):
+            # ── Module C: Strategic Oscillation ─────────────────────
+            # Alternate between normal (uncapped) and capped phases.
+            # During oscillation, weights are clipped to the oscillation
+            # cap before normalisation — this biases the search toward
+            # more diversified portfolios and explores the constraint
+            # boundary from both sides.
             cycle_pos = (iteration // self.osc_period) % 2
             oscillation_active = (cycle_pos == 1)
-            
-            if iters_without_improvement > stagnation_threshold:
-                # Global Diversification Restart
-                step_scale = 0.5
-                keys_to_remove = list(tabu_list.keys())[: len(tabu_list) // 2]
-                for k in keys_to_remove:
-                    del tabu_list[k]
-                iters_without_improvement = 0
-
-            # ── Mass Vectorized Generation for the ENTIRE Swarm ──
-            current_repeated = np.repeat(current_swarm, self.neighbors_size, axis=0)
-            
-            total_candidates = self.swarm_size * self.neighbors_size
-            steps = levy_flight((total_candidates, self.n_assets), self.beta)
-            candidates_2d = current_repeated + step_scale * steps
-            
             if oscillation_active:
-                candidates_2d = repair_weights_capped_2d(candidates_2d, self.oscillation_cap)
+                phase = "Oscillate"
             else:
-                candidates_2d = repair_weights_2d(candidates_2d)
-                
+                phase = "Feasible"
+
+            # Determine search phase label for logging
+            if iters_without_improvement > stagnation_threshold // 2:
+                phase = "Diversify"
+            elif iters_without_improvement == 0 and iteration > 0:
+                phase = "Intensify"
+
+            # ── Generate neighbors (Module A: Lévy Flight - Vectorized) ──
+            candidates_2d = self._generate_neighbors_2d(
+                current, step_scale, use_cap=oscillation_active
+            )
+            
             cand_sharpes, cand_rets, cand_risks = sharpe_ratio_2d(
                 candidates_2d, self.returns_data, self.cov_matrix, self.rf
             )
 
-            improved_this_iter = False
+            neighbors = []
+            for i in range(self.neighbors_size):
+                cand_w = candidates_2d[i]
+                cand_s = cand_sharpes[i]
+                cand_h = self._hash(cand_w)
 
-            # ── Agent-by-Agent Update ──
-            for agent_idx in range(self.swarm_size):
-                start_idx = agent_idx * self.neighbors_size
-                end_idx = start_idx + self.neighbors_size
-                
-                agent_w = candidates_2d[start_idx:end_idx]
-                agent_s = cand_sharpes[start_idx:end_idx]
-                agent_rets = cand_rets[start_idx:end_idx]
-                agent_risks = cand_risks[start_idx:end_idx]
-                
-                indices = np.arange(self.neighbors_size)
-                np.random.shuffle(indices)
-                indices = sorted(indices, key=lambda idx: agent_s[idx], reverse=True)
-                
-                best_neighbor_found = False
-                
-                for idx in indices:
-                    cand_w_single = agent_w[idx]
-                    cand_s_single = agent_s[idx]
-                    cand_h = self._hash(cand_w_single)
-                    
-                    all_explored.append((agent_risks[idx], agent_rets[idx], cand_s_single))
-                    
-                    is_tabu = cand_h in tabu_list and tabu_list[cand_h] >= iteration
-                    
-                    # Multi-Objective Aspiration
-                    if is_tabu and cand_s_single > best_sharpe:
-                        is_tabu = False
-                        
-                    if not is_tabu:
-                        current_swarm[agent_idx] = cand_w_single
-                        visit_count[cand_h] += 1
-                        
-                        if visit_count[cand_h] >= self.cycle_threshold:
-                            tenure = min(self.max_tenure, int(tenure * 1.5))
-                            visit_count[cand_h] = 0
-                        else:
-                            tenure = max(self.min_tenure, int(tenure * 0.95))
-                            
-                        tabu_list[cand_h] = iteration + tenure
-                        best_neighbor_found = True
-                        
-                        if cand_s_single > best_sharpe:
-                            best_sharpe = cand_s_single
-                            best_weights = cand_w_single.copy()
-                            improved_this_iter = True
-                            
-                        break
-                        
-                if not best_neighbor_found:
-                    # Stagnation fallback: pick absolute best even if tabu
-                    best_idx_agent = indices[0]
-                    current_swarm[agent_idx] = agent_w[best_idx_agent]
-                    
-            if improved_this_iter:
+                # Track for Pareto plot
+                all_explored.append((cand_risks[i], cand_rets[i], cand_s))
+                neighbors.append((cand_w, cand_s, cand_h))
+
+            # Sort descending by Sharpe (maximisation)
+            np.random.shuffle(neighbors)  # break ties randomly
+            neighbors.sort(key=lambda t: t[1], reverse=True)
+
+            # ── Module D: Multi-Objective Aspiration Criteria ──────
+            accepted = None
+            for cand_w, cand_s, cand_h in neighbors:
+                # Aspiration: if beats global best → override tabu
+                if cand_s > best_sharpe:
+                    accepted = (cand_w, cand_s, cand_h)
+                    break
+                # Normal: accept if not tabu
+                if cand_h not in tabu_list:
+                    accepted = (cand_w, cand_s, cand_h)
+                    break
+
+            # Fallback: if everything is tabu, take the best anyway
+            if accepted is None:
+                accepted = neighbors[0]
+
+            new_weights, new_sharpe, new_hash = accepted
+
+            # ── Update current solution ────────────────────────────
+            current = new_weights
+            current_sharpe = new_sharpe
+
+            # Add to tabu list
+            tabu_list.append(new_hash)
+
+            # ── Module B: Reactive Tenure ──────────────────────────
+            visit_count[new_hash] += 1
+
+            if new_sharpe > best_sharpe:
+                # Improvement found
+                best_weights = new_weights.copy()
+                best_sharpe = new_sharpe
                 iters_without_improvement = 0
+
+                # Intensify: decrease tenure for fine-tuning
+                tenure = max(self.min_tenure, tenure - 1)
+                tabu_list = deque(tabu_list, maxlen=tenure * 3)
+
             else:
                 iters_without_improvement += 1
 
-            step_scale = max(0.005, step_scale * step_decay)
-            
-            # Log progress based on Global Best
-            if iteration % 100 == 0:
-                convergence_log.append((
-                    iteration, best_sharpe, best_sharpe, tenure, "Swarm Phase"
-                ))
+                # Cycle detection: if same region visited too often
+                if visit_count[new_hash] >= self.cycle_threshold:
+                    # Diversify: exponential tenure increase
+                    tenure = min(self.max_tenure, int(tenure * 1.5))
+                    tabu_list = deque(tabu_list, maxlen=tenure * 3)
 
-        # Final metrics
-        final_metrics = calc_all_metrics(
-            best_weights, self.returns_data, self.cov_matrix, self.rf
-        )
+                elif iters_without_improvement > stagnation_threshold // 2:
+                    # Gradual tenure increase
+                    tenure = min(self.max_tenure, tenure + 1)
+                    tabu_list = deque(tabu_list, maxlen=tenure * 3)
 
-        final_metrics['best_sharpe'] = best_sharpe
-        final_metrics['best_return'] = final_metrics['return']
-        final_metrics['best_risk'] = final_metrics['risk']
-        final_metrics['best_weights'] = best_weights
-        final_metrics['convergence_log'] = convergence_log
-        final_metrics['all_explored'] = all_explored
+            # ── Diversification restart if stuck ───────────────────
+            if iters_without_improvement >= stagnation_threshold:
+                if diversification_count < max_diversifications:
+                    # Restart near best with large Lévy perturbation
+                    current = self._generate_neighbor(
+                        best_weights, step_scale * 5.0, use_cap=False
+                    )
+                    current_sharpe = self._sharpe(current)
 
-        return final_metrics
+                    # Reset step scale
+                    step_scale = max(0.08, step_scale * 2.0)
+
+                    # Partially clear tabu list
+                    for _ in range(len(tabu_list) // 2):
+                        if tabu_list:
+                            tabu_list.popleft()
+
+                    # Partially clear visit counts
+                    visit_count.clear()
+
+                    iters_without_improvement = 0
+                    diversification_count += 1
+
+            # ── Decay step scale ───────────────────────────────────
+            step_scale = max(min_step_scale, step_scale * step_decay)
+
+            # ── Convergence log every 10 iterations ────────────────
+            if iteration % 10 == 0 or iteration == self.max_iter - 1:
+                convergence_log.append(
+                    (iteration, best_sharpe, current_sharpe, tenure, phase)
+                )
+
+        # ── Final: ensure best weights satisfy hard constraints ────
+        best_weights = repair_weights(best_weights)
+        best_sharpe = self._sharpe(best_weights)
+
+        best_ret = calc_annual_return(best_weights, self.returns_data)
+        best_risk = calc_annual_risk(best_weights, self.cov_matrix)
+
+        return {
+            'best_weights': best_weights,
+            'best_sharpe': best_sharpe,
+            'best_return': best_ret,
+            'best_risk': best_risk,
+            'convergence_log': convergence_log,
+            'all_explored': all_explored,
+        }

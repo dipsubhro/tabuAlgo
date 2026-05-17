@@ -25,7 +25,11 @@ warnings.filterwarnings('ignore')
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from yahoo_finance_experiment.rts_portfolio.rts_engine import ReactiveTabuSearch
+from yahoo_finance_experiment.rts_portfolio import SingleReactiveTabuSearch, SwarmReactiveTabuSearch
+
+# ── ALGORITHM SELECTOR ──
+ALGORITHM = "SINGLE"  # Options: "SINGLE" or "SWARM"
+
 from yahoo_finance_experiment.rts_portfolio.fitness import (
     repair_weights, calc_annual_return, calc_annual_risk,
     calc_all_metrics,
@@ -102,21 +106,35 @@ def _run_single(args):
     """Run a single RTS instance. Designed for ProcessPoolExecutor."""
     (returns_data, cov_matrix, n_assets, seed, rf,
      max_iter, swarm_size, neighbors_size, initial_tenure,
-     weight_cap, oscillation_cap) = args
+     weight_cap, oscillation_cap, algo_type) = args
 
-    rts = ReactiveTabuSearch(
-        returns_data=returns_data,
-        cov_matrix=cov_matrix,
-        n_assets=n_assets,
-        rf=rf,
-        max_iter=max_iter,
-        swarm_size=swarm_size,
-        neighbors_size=neighbors_size,
-        initial_tenure=initial_tenure,
-        weight_cap=weight_cap,
-        oscillation_cap=oscillation_cap,
-        seed=seed,
-    )
+    if algo_type == "SWARM":
+        rts = SwarmReactiveTabuSearch(
+            returns_data=returns_data,
+            cov_matrix=cov_matrix,
+            n_assets=n_assets,
+            rf=rf,
+            max_iter=max_iter,
+            swarm_size=swarm_size,
+            neighbors_size=neighbors_size,
+            initial_tenure=initial_tenure,
+            weight_cap=weight_cap,
+            oscillation_cap=oscillation_cap,
+            seed=seed,
+        )
+    else:
+        rts = SingleReactiveTabuSearch(
+            returns_data=returns_data,
+            cov_matrix=cov_matrix,
+            n_assets=n_assets,
+            rf=rf,
+            max_iter=max_iter,
+            neighbors_size=neighbors_size,
+            initial_tenure=initial_tenure,
+            weight_cap=weight_cap,
+            oscillation_cap=oscillation_cap,
+            seed=seed,
+        )
     return rts.run()
 
 
@@ -254,8 +272,12 @@ def plot_pareto_front(all_explored, pareto_front, best_result,
 
 def main():
     print("\n" + "=" * 70)
-    print("  REACTIVE TABU SEARCH (RTS) — S&P 500 Portfolio Optimization")
-    print("  Modules: Lévy Flight | Reactive Tenure | Strategic Oscillation")
+    if ALGORITHM == "SWARM":
+        print("  MULTI-SOLUTION SWARM RTS — S&P 500 Portfolio Optimization")
+        print("  Modules: Lévy Flight | Swarm Memory | Strategic Oscillation")
+    else:
+        print("  SINGLE-SOLUTION RTS — S&P 500 Portfolio Optimization")
+        print("  Modules: Lévy Flight | Reactive Tenure | Strategic Oscillation")
     print("           | Multi-Objective Aspiration")
     print("  Dataset: S&P 500, Jan 2013 – Jan 2023")
     print("=" * 70)
@@ -287,24 +309,29 @@ def main():
 
     # ── Step 2: Run RTS ───────────────────────────────────────────
     NUM_RUNS = 30
-    MAX_ITER = 2000
-    SWARM_SIZE = 10
+    if ALGORITHM == "SWARM":
+        MAX_ITER = 2000
+        SWARM_SIZE = 10
+    else:
+        MAX_ITER = 5000
+        SWARM_SIZE = 1
     NEIGHBORS = 50
     TENURE = 10
     WEIGHT_CAP = 0.10
     OSC_CAP = 0.15
     SEEDS = list(range(42, 42 + NUM_RUNS))
 
-    print(f"\n  [2] Running Multi-Solution Swarm RTS ({NUM_RUNS} runs)...")
-    print(f"      Iterations={MAX_ITER}, Swarm Size={SWARM_SIZE}, Neighbors={NEIGHBORS}, "
-          f"Tenure={TENURE}")
-    print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, "
-          f"Oscillation cap={OSC_CAP*100:.0f}%")
+    print(f"\n  [2] Running {ALGORITHM} RTS ({NUM_RUNS} runs)...")
+    if ALGORITHM == "SWARM":
+        print(f"      Iterations={MAX_ITER}, Swarm Size={SWARM_SIZE}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
+    else:
+        print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
+    print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, Oscillation cap={OSC_CAP*100:.0f}%")
 
     # Build argument tuples for parallel execution
     run_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, SWARM_SIZE, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP)
+         MAX_ITER, SWARM_SIZE, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP, ALGORITHM)
         for seed in SEEDS
     ]
 
