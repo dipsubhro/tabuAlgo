@@ -24,6 +24,9 @@ from .fitness import (
     calc_annual_return,
     calc_annual_risk,
     sharpe_ratio,
+    repair_weights_2d,
+    repair_weights_capped_2d,
+    sharpe_ratio_2d,
 )
 
 
@@ -31,7 +34,7 @@ from .fitness import (
 # MODULE A — Lévy Flight Neighborhood Generator
 # ═══════════════════════════════════════════════════════════════════════════
 
-def levy_flight(n, beta=1.5):
+def levy_flight(size, beta=1.5):
     """
     Generate Lévy flight step sizes via Mantegna's algorithm.
 
@@ -45,8 +48,8 @@ def levy_flight(n, beta=1.5):
         _gamma(1 + beta) * math.sin(math.pi * beta / 2)
         / (_gamma((1 + beta) / 2) * beta * 2 ** ((beta - 1) / 2))
     ) ** (1 / beta)
-    u = np.random.normal(0, sigma_u, n)
-    v = np.random.normal(0, 1, n)
+    u = np.random.normal(0, sigma_u, size)
+    v = np.random.normal(0, 1, size)
     step = u / (np.abs(v) ** (1.0 / beta))
     return step
 
@@ -146,15 +149,22 @@ class ReactiveTabuSearch:
         """
         Perturb `current` weights using a Lévy flight step,
         then repair to satisfy constraints.
-
-        When use_cap is True (oscillation phase), applies the weight cap
-        via repair_weights_capped to approach constraint boundaries.
         """
         steps = levy_flight(self.n_assets, self.beta)
         candidate = current + step_scale * steps
         if use_cap:
             return repair_weights_capped(candidate, self.oscillation_cap)
         return repair_weights(candidate)
+
+    def _generate_neighbors_2d(self, current, step_scale, use_cap=False):
+        """
+        Vectorized version to generate all neighbors at once.
+        """
+        steps = levy_flight((self.neighbors_size, self.n_assets), self.beta)
+        candidates = current + step_scale * steps
+        if use_cap:
+            return repair_weights_capped_2d(candidates, self.oscillation_cap)
+        return repair_weights_2d(candidates)
 
     # -------------------------------------------------------------------
     # Main search loop
@@ -221,21 +231,24 @@ class ReactiveTabuSearch:
             elif iters_without_improvement == 0 and iteration > 0:
                 phase = "Intensify"
 
-            # ── Generate neighbors (Module A: Lévy Flight) ─────────
+            # ── Generate neighbors (Module A: Lévy Flight - Vectorized) ──
+            candidates_2d = self._generate_neighbors_2d(
+                current, step_scale, use_cap=oscillation_active
+            )
+            
+            cand_sharpes, cand_rets, cand_risks = sharpe_ratio_2d(
+                candidates_2d, self.returns_data, self.cov_matrix, self.rf
+            )
+
             neighbors = []
-            for _ in range(self.neighbors_size):
-                candidate = self._generate_neighbor(
-                    current, step_scale, use_cap=oscillation_active
-                )
-                cand_sharpe = self._sharpe(candidate)
-                cand_hash = self._hash(candidate)
+            for i in range(self.neighbors_size):
+                cand_w = candidates_2d[i]
+                cand_s = cand_sharpes[i]
+                cand_h = self._hash(cand_w)
 
                 # Track for Pareto plot
-                cand_ret = calc_annual_return(candidate, self.returns_data)
-                cand_risk = calc_annual_risk(candidate, self.cov_matrix)
-                all_explored.append((cand_risk, cand_ret, cand_sharpe))
-
-                neighbors.append((candidate, cand_sharpe, cand_hash))
+                all_explored.append((cand_risks[i], cand_rets[i], cand_s))
+                neighbors.append((cand_w, cand_s, cand_h))
 
             # Sort descending by Sharpe (maximisation)
             np.random.shuffle(neighbors)  # break ties randomly

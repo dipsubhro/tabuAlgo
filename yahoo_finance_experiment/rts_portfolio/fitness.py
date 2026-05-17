@@ -106,3 +106,63 @@ def calc_all_metrics(weights, returns_data, cov_matrix, rf=0.02):
         'sharpe': s,
         'max_drawdown': max_drawdown,
     }
+
+
+# ---------------------------------------------------------------------------
+# Vectorized 2D Functions for Fast Batched Evaluation
+# ---------------------------------------------------------------------------
+
+def repair_weights_2d(weights_2d):
+    """
+    Repair a batch of portfolio weights.
+    weights_2d : ndarray of shape (N_neighbors, N_assets)
+    """
+    w = np.clip(weights_2d, 0.0, None)
+    total = w.sum(axis=1, keepdims=True)
+    
+    # Handle rows where all weights were clipped to 0
+    zero_mask = (total <= 0.0).flatten()
+    if np.any(zero_mask):
+        w[zero_mask, :] = 1.0 / w.shape[1]
+        total[zero_mask, 0] = 1.0
+        
+    return w / total
+
+
+def repair_weights_capped_2d(weights_2d, cap):
+    """
+    Repair a batch of portfolio weights with a cap.
+    """
+    w = np.clip(weights_2d, 0.0, cap)
+    total = w.sum(axis=1, keepdims=True)
+    
+    zero_mask = (total <= 0.0).flatten()
+    if np.any(zero_mask):
+        w[zero_mask, :] = 1.0 / w.shape[1]
+        total[zero_mask, 0] = 1.0
+        
+    return w / total
+
+
+def sharpe_ratio_2d(weights_2d, returns_data, cov_matrix, rf=0.02):
+    """
+    Calculate Sharpe Ratio, Annual Return, and Annual Risk for a batch of weights.
+    Returns: sharpe_array, return_array, risk_array
+    """
+    mean_ret = np.mean(returns_data, axis=0)
+    
+    # Annual Return
+    ret = np.sum(weights_2d * mean_ret, axis=1) * 252
+    
+    # Annual Risk (Batched quadratic form)
+    # weights_2d shape: (N, n_assets)
+    # cov_matrix shape: (n_assets, n_assets)
+    # (w @ cov) * w sum over axis 1 -> w^T cov w for each row
+    variance = np.sum((weights_2d @ cov_matrix) * weights_2d, axis=1) * 252
+    risk = np.sqrt(np.maximum(variance, 0.0))
+    
+    s = np.zeros_like(ret)
+    valid = risk > 1e-10
+    s[valid] = (ret[valid] - rf) / risk[valid]
+    
+    return s, ret, risk
