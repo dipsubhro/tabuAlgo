@@ -1,0 +1,337 @@
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:314: SyntaxWarning: invalid escape sequence '\.'
+  with open(results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q1.txt', 'w') as f:
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:323: SyntaxWarning: invalid escape sequence '\.'
+  with open(results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q2_d.txt', 'w') as f:
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:484: SyntaxWarning: invalid escape sequence '\.'
+  with open(results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q2_e.txt', 'w') as f:
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:546: SyntaxWarning: invalid escape sequence '\.'
+  filename = results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q3_R' + '.png'
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:593: SyntaxWarning: invalid escape sequence '\.'
+  filename = results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q3_f' + '.png'
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:627: SyntaxWarning: invalid escape sequence '\.'
+  filename = results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q4_' + '_Frontier_RS'  + '.png'
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:655: SyntaxWarning: invalid escape sequence '\.'
+  filename = results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q4_' + '_Frontier_TS' + '.png'
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:698: SyntaxWarning: invalid escape sequence '\.'
+  pd.DataFrame(dominated_points).to_excel(results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q4_' + 'H_' + alg +'.xlsx', index=False)
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:700: SyntaxWarning: invalid escape sequence '\.'
+  pd.DataFrame(dominating_points).to_excel(results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q4_' + 'H_' + alg + '_filtered.xlsx', index=False)
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:702: SyntaxWarning: invalid escape sequence '\.'
+  pd.DataFrame(assets).to_excel(results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q4_' + 'AssetsToInvest_' + alg + '.xlsx', index=False)
+/home/subhro/Desktop/tabu/PortfolioOptimization/portfolio_opt.py:704: SyntaxWarning: invalid escape sequence '\.'
+  pd.DataFrame(weights).to_excel(results_dir + re.sub('[^a-zA-Z0-9 \n\.]', '_', file[:-4]) + '_Q4_' + 'WeightToInvest_' + alg + '.xlsx', index=False)
+
+==================================================
+Loading Hang Seng from PortfolioOptimization/datasets/assets1.txt ...
+==================================================
+  N = 31 assets
+  K = 10, epsilon = 0.01, lambda = 0.5
+  Running 30 Tabu Search runs (seeds 42-71) ...
+
+  Run  1/30  seed=42  R=0.009027  Var=0.002420
+  Run  2/30  seed=43  R=0.009052  Var=0.002445
+  Run  3/30  seed=44  R=0.009114  Var=0.002508
+  Run  4/30  seed=45  R=0.009027  Var=0.002419
+  Run  5/30  seed=46  R=0.009125  Var=0.002519
+  Run  6/30  seed=47  R=0.009032  Var=0.002426
+  Run  7/30  seed=48  R=0.009090  Var=0.002484
+  Run  8/30  seed=49  R=0.009082  Var=0.002476
+  Run  9/30  seed=50  R=0.009106  Var=0.002498
+  Run 10/30  seed=51  R=0.009030  Var=0.002425
+  Run 11/30  seed=52  R=0.009093  Var=0.002487
+  Run 12/30  seed=53  R=0.009058  Var=0.002450
+  Run 13/30  seed=54  R=0.009033  Var=0.002427
+  Run 14/30  seed=55  R=0.009030  Var=0.002422
+  Run 15/30  seed=56  R=0.009068  Var=0.002462
+  Run 16/30  seed=57  R=0.009028  Var=0.002422
+  Run 17/30  seed=58  R=0.009109  Var=0.002502
+  Run 18/30  seed=59  R=0.009055  Var=0.002448
+  Run 19/30  seed=60  R=0.009174  Var=0.002571
+  Run 20/30  seed=61  R=0.009090  Var=0.002483
+  Run 21/30  seed=62  R=0.008997  Var=0.002392
+  Run 22/30  seed=63  R=0.009111  Var=0.002504
+  Run 23/30  seed=64  R=0.009029  Var=0.002423
+  Run 24/30  seed=65  R=0.009075  Var=0.002469
+  Run 25/30  seed=66  R=0.009100  Var=0.002493
+  Run 26/30  seed=67  R=0.009080  Var=0.002474
+  Run 27/30  seed=68  R=0.009080  Var=0.002472
+  Run 28/30  seed=69  R=0.009007  Var=0.002403
+  Run 29/30  seed=70  R=0.009049  Var=0.002441
+  Run 30/30  seed=71  R=0.009039  Var=0.002432
+
+==============================================
+Dataset : Hang Seng  |  N = 31 assets
+==============================================
+Best Return          : 0.008997
+Best Variance        : 0.002392
+Best Sharpe Ratio    : 0.183961
+Mean Return (30 runs): 0.009066
+Mean Variance        : 0.002460
+Std Dev of Return    : 0.000040
+Best Portfolio Weights:
+  Asset 04 : 0.0100
+  Asset 05 : 0.5972
+  Asset 08 : 0.0100
+  Asset 09 : 0.1918
+  Asset 12 : 0.0100
+  Asset 13 : 0.0100
+  Asset 15 : 0.0100
+  Asset 20 : 0.0100
+  Asset 26 : 0.0137
+  Asset 29 : 0.1373
+==============================================
+
+==================================================
+Loading DAX 100 from PortfolioOptimization/datasets/assets2.txt ...
+==================================================
+  N = 85 assets
+  K = 10, epsilon = 0.01, lambda = 0.5
+  Running 30 Tabu Search runs (seeds 42-71) ...
+
+  Run  1/30  seed=42  R=0.008884  Var=0.000906
+  Run  2/30  seed=43  R=0.008863  Var=0.000885
+  Run  3/30  seed=44  R=0.008866  Var=0.000889
+  Run  4/30  seed=45  R=0.008861  Var=0.000884
+  Run  5/30  seed=46  R=0.008838  Var=0.000865
+  Run  6/30  seed=47  R=0.008841  Var=0.000867
+  Run  7/30  seed=48  R=0.008841  Var=0.000868
+  Run  8/30  seed=49  R=0.008876  Var=0.000900
+  Run  9/30  seed=50  R=0.008824  Var=0.000852
+  Run 10/30  seed=51  R=0.008853  Var=0.000877
+  Run 11/30  seed=52  R=0.008864  Var=0.000886
+  Run 12/30  seed=53  R=0.008853  Var=0.000878
+  Run 13/30  seed=54  R=0.008844  Var=0.000870
+  Run 14/30  seed=55  R=0.008846  Var=0.000871
+  Run 15/30  seed=56  R=0.008852  Var=0.000876
+  Run 16/30  seed=57  R=0.008846  Var=0.000871
+  Run 17/30  seed=58  R=0.008869  Var=0.000890
+  Run 18/30  seed=59  R=0.008869  Var=0.000890
+  Run 19/30  seed=60  R=0.008883  Var=0.000905
+  Run 20/30  seed=61  R=0.008860  Var=0.000883
+  Run 21/30  seed=62  R=0.008839  Var=0.000865
+  Run 22/30  seed=63  R=0.008874  Var=0.000899
+  Run 23/30  seed=64  R=0.008865  Var=0.000892
+  Run 24/30  seed=65  R=0.008881  Var=0.000903
+  Run 25/30  seed=66  R=0.008874  Var=0.000895
+  Run 26/30  seed=67  R=0.008845  Var=0.000870
+  Run 27/30  seed=68  R=0.008872  Var=0.000893
+  Run 28/30  seed=69  R=0.008849  Var=0.000873
+  Run 29/30  seed=70  R=0.008842  Var=0.000868
+  Run 30/30  seed=71  R=0.008851  Var=0.000876
+
+==============================================
+Dataset : DAX 100  |  N = 85 assets
+==============================================
+Best Return          : 0.008824
+Best Variance        : 0.000852
+Best Sharpe Ratio    : 0.302326
+Mean Return (30 runs): 0.008857
+Mean Variance        : 0.000882
+Std Dev of Return    : 0.000015
+Best Portfolio Weights:
+  Asset 02 : 0.0100
+  Asset 11 : 0.0100
+  Asset 13 : 0.4989
+  Asset 29 : 0.0444
+  Asset 37 : 0.0100
+  Asset 38 : 0.3867
+  Asset 46 : 0.0100
+  Asset 49 : 0.0100
+  Asset 69 : 0.0100
+  Asset 74 : 0.0100
+==============================================
+
+==================================================
+Loading FTSE 100 from PortfolioOptimization/datasets/assets3.txt ...
+==================================================
+  N = 89 assets
+  K = 10, epsilon = 0.01, lambda = 0.5
+  Running 30 Tabu Search runs (seeds 42-71) ...
+
+  Run  1/30  seed=42  R=0.007836  Var=0.001189
+  Run  2/30  seed=43  R=0.007835  Var=0.001189
+  Run  3/30  seed=44  R=0.007832  Var=0.001185
+  Run  4/30  seed=45  R=0.007844  Var=0.001198
+  Run  5/30  seed=46  R=0.007843  Var=0.001197
+  Run  6/30  seed=47  R=0.007839  Var=0.001193
+  Run  7/30  seed=48  R=0.007833  Var=0.001187
+  Run  8/30  seed=49  R=0.007831  Var=0.001184
+  Run  9/30  seed=50  R=0.007845  Var=0.001198
+  Run 10/30  seed=51  R=0.007836  Var=0.001190
+  Run 11/30  seed=52  R=0.007833  Var=0.001187
+  Run 12/30  seed=53  R=0.007840  Var=0.001194
+  Run 13/30  seed=54  R=0.007844  Var=0.001197
+  Run 14/30  seed=55  R=0.007846  Var=0.001199
+  Run 15/30  seed=56  R=0.007832  Var=0.001186
+  Run 16/30  seed=57  R=0.007833  Var=0.001187
+  Run 17/30  seed=58  R=0.007833  Var=0.001187
+  Run 18/30  seed=59  R=0.007846  Var=0.001199
+  Run 19/30  seed=60  R=0.007836  Var=0.001190
+  Run 20/30  seed=61  R=0.007832  Var=0.001186
+  Run 21/30  seed=62  R=0.007847  Var=0.001200
+  Run 22/30  seed=63  R=0.007833  Var=0.001186
+  Run 23/30  seed=64  R=0.007835  Var=0.001188
+  Run 24/30  seed=65  R=0.007834  Var=0.001188
+  Run 25/30  seed=66  R=0.007841  Var=0.001195
+  Run 26/30  seed=67  R=0.007847  Var=0.001201
+  Run 27/30  seed=68  R=0.007833  Var=0.001187
+  Run 28/30  seed=69  R=0.007837  Var=0.001190
+  Run 29/30  seed=70  R=0.007847  Var=0.001200
+  Run 30/30  seed=71  R=0.007844  Var=0.001198
+
+==============================================
+Dataset : FTSE 100  |  N = 89 assets
+==============================================
+Best Return          : 0.007831
+Best Variance        : 0.001184
+Best Sharpe Ratio    : 0.227538
+Mean Return (30 runs): 0.007838
+Mean Variance        : 0.001192
+Std Dev of Return    : 0.000005
+Best Portfolio Weights:
+  Asset 02 : 0.0100
+  Asset 09 : 0.0100
+  Asset 10 : 0.0610
+  Asset 18 : 0.8348
+  Asset 29 : 0.0342
+  Asset 37 : 0.0100
+  Asset 44 : 0.0100
+  Asset 55 : 0.0100
+  Asset 71 : 0.0100
+  Asset 82 : 0.0100
+==============================================
+
+==================================================
+Loading S&P 100 from PortfolioOptimization/datasets/assets4.txt ...
+==================================================
+  N = 98 assets
+  K = 10, epsilon = 0.01, lambda = 0.5
+  Running 30 Tabu Search runs (seeds 42-71) ...
+
+  Run  1/30  seed=42  R=0.008411  Var=0.001223
+  Run  2/30  seed=43  R=0.008428  Var=0.001240
+  Run  3/30  seed=44  R=0.008416  Var=0.001227
+  Run  4/30  seed=45  R=0.008422  Var=0.001233
+  Run  5/30  seed=46  R=0.008431  Var=0.001243
+  Run  6/30  seed=47  R=0.008434  Var=0.001246
+  Run  7/30  seed=48  R=0.008424  Var=0.001235
+  Run  8/30  seed=49  R=0.008418  Var=0.001229
+  Run  9/30  seed=50  R=0.008415  Var=0.001226
+  Run 10/30  seed=51  R=0.008425  Var=0.001236
+  Run 11/30  seed=52  R=0.008417  Var=0.001229
+  Run 12/30  seed=53  R=0.008422  Var=0.001233
+  Run 13/30  seed=54  R=0.008435  Var=0.001247
+  Run 14/30  seed=55  R=0.008427  Var=0.001239
+  Run 15/30  seed=56  R=0.008431  Var=0.001243
+  Run 16/30  seed=57  R=0.008418  Var=0.001229
+  Run 17/30  seed=58  R=0.008420  Var=0.001232
+  Run 18/30  seed=59  R=0.008414  Var=0.001226
+  Run 19/30  seed=60  R=0.008423  Var=0.001234
+  Run 20/30  seed=61  R=0.008414  Var=0.001226
+  Run 21/30  seed=62  R=0.008436  Var=0.001247
+  Run 22/30  seed=63  R=0.008413  Var=0.001224
+  Run 23/30  seed=64  R=0.008429  Var=0.001240
+  Run 24/30  seed=65  R=0.008426  Var=0.001238
+  Run 25/30  seed=66  R=0.008401  Var=0.001212
+  Run 26/30  seed=67  R=0.008437  Var=0.001248
+  Run 27/30  seed=68  R=0.008435  Var=0.001246
+  Run 28/30  seed=69  R=0.008431  Var=0.001243
+  Run 29/30  seed=70  R=0.008424  Var=0.001235
+  Run 30/30  seed=71  R=0.008407  Var=0.001218
+
+==============================================
+Dataset : S&P 100  |  N = 98 assets
+==============================================
+Best Return          : 0.008401
+Best Variance        : 0.001212
+Best Sharpe Ratio    : 0.241288
+Mean Return (30 runs): 0.008423
+Mean Variance        : 0.001234
+Std Dev of Return    : 0.000009
+Best Portfolio Weights:
+  Asset 02 : 0.0100
+  Asset 14 : 0.0100
+  Asset 23 : 0.0100
+  Asset 34 : 0.2252
+  Asset 36 : 0.0100
+  Asset 42 : 0.2352
+  Asset 43 : 0.0100
+  Asset 76 : 0.0100
+  Asset 82 : 0.3148
+  Asset 89 : 0.1648
+==============================================
+
+==================================================
+Loading Nikkei 225 from PortfolioOptimization/datasets/assets5.txt ...
+==================================================
+  N = 225 assets
+  K = 10, epsilon = 0.01, lambda = 0.5
+  Running 30 Tabu Search runs (seeds 42-71) ...
+
+  Run  1/30  seed=42  R=0.003603  Var=0.000722
+  Run  2/30  seed=43  R=0.003605  Var=0.000724
+  Run  3/30  seed=44  R=0.003602  Var=0.000721
+  Run  4/30  seed=45  R=0.003600  Var=0.000719
+  Run  5/30  seed=46  R=0.003607  Var=0.000727
+  Run  6/30  seed=47  R=0.003609  Var=0.000728
+  Run  7/30  seed=48  R=0.003609  Var=0.000728
+  Run  8/30  seed=49  R=0.003606  Var=0.000725
+  Run  9/30  seed=50  R=0.003608  Var=0.000727
+  Run 10/30  seed=51  R=0.003604  Var=0.000723
+  Run 11/30  seed=52  R=0.003603  Var=0.000721
+  Run 12/30  seed=53  R=0.003608  Var=0.000728
+  Run 13/30  seed=54  R=0.003598  Var=0.000717
+  Run 14/30  seed=55  R=0.003613  Var=0.000732
+  Run 15/30  seed=56  R=0.003603  Var=0.000723
+  Run 16/30  seed=57  R=0.003608  Var=0.000727
+  Run 17/30  seed=58  R=0.003602  Var=0.000721
+  Run 18/30  seed=59  R=0.003606  Var=0.000726
+  Run 19/30  seed=60  R=0.003608  Var=0.000727
+  Run 20/30  seed=61  R=0.003603  Var=0.000722
+  Run 21/30  seed=62  R=0.003612  Var=0.000731
+  Run 22/30  seed=63  R=0.003605  Var=0.000724
+  Run 23/30  seed=64  R=0.003606  Var=0.000724
+  Run 24/30  seed=65  R=0.003609  Var=0.000729
+  Run 25/30  seed=66  R=0.003604  Var=0.000723
+  Run 26/30  seed=67  R=0.003607  Var=0.000726
+  Run 27/30  seed=68  R=0.003608  Var=0.000727
+  Run 28/30  seed=69  R=0.003606  Var=0.000726
+  Run 29/30  seed=70  R=0.003605  Var=0.000724
+  Run 30/30  seed=71  R=0.003604  Var=0.000722
+
+==============================================
+Dataset : Nikkei 225  |  N = 225 assets
+==============================================
+Best Return          : 0.003598
+Best Variance        : 0.000717
+Best Sharpe Ratio    : 0.134359
+Mean Return (30 runs): 0.003606
+Mean Variance        : 0.000725
+Std Dev of Return    : 0.000003
+Best Portfolio Weights:
+  Asset 02 : 0.0100
+  Asset 09 : 0.3201
+  Asset 40 : 0.0104
+  Asset 43 : 0.0683
+  Asset 62 : 0.2834
+  Asset 115 : 0.0441
+  Asset 165 : 0.0109
+  Asset 188 : 0.0100
+  Asset 214 : 0.2327
+  Asset 215 : 0.0100
+==============================================
+
+
+
+=========================================================================================================
+FINAL SUMMARY — ALL DATASETS
+=========================================================================================================
+| Dataset      |   N |  Best Return |  Best Variance | Sharpe Ratio |  Mean Return |  Std Dev |
+|--------------|-----|--------------|----------------|--------------|--------------|----------|
+| Hang Seng    |  31 |      0.00900 |        0.00239 |      0.18396 |      0.00907 |  0.00004 |
+| DAX 100      |  85 |      0.00882 |        0.00085 |      0.30233 |      0.00886 |  0.00002 |
+| FTSE 100     |  89 |      0.00783 |        0.00118 |      0.22754 |      0.00784 |  0.00001 |
+| S&P 100      |  98 |      0.00840 |        0.00121 |      0.24129 |      0.00842 |  0.00001 |
+| Nikkei 225   | 225 |      0.00360 |        0.00072 |      0.13436 |      0.00361 |  0.00000 |
+|--------------|-----|--------------|----------------|--------------|--------------|----------|
+
