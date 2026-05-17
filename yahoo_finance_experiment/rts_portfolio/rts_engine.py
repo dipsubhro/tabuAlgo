@@ -103,6 +103,7 @@ class ReactiveTabuSearch:
         oscillation_cap=0.15,
         beta=1.5,
         cycle_threshold=3,
+        osc_period=None,
         seed=None,
     ):
         self.returns_data = returns_data
@@ -124,7 +125,7 @@ class ReactiveTabuSearch:
 
         # ── Strategic oscillation schedule (Module C) ──
         # Oscillation toggles every `osc_period` iterations
-        self.osc_period = max(50, max_iter // 20)
+        self.osc_period = osc_period if osc_period is not None else max(50, max_iter // 20)
 
     # -------------------------------------------------------------------
     # Evaluate a candidate
