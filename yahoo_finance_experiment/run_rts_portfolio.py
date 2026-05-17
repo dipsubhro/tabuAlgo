@@ -3,7 +3,7 @@ Reactive Tabu Search — S&P 500 Portfolio Optimization Runner
 =============================================================
 
 Uses the EXACT same dataset and calculations as the RMPSO reference script
-(download_yahoo_finance_data(1).py) for a fair head-to-head comparison.
+(yfdataset.py) for a fair head-to-head comparison.
 
 Produces three required outputs:
   1. Convergence Table   → rts_convergence.txt
@@ -21,13 +21,14 @@ from tabulate import tabulate
 
 warnings.filterwarnings('ignore')
 
-# Ensure project root is on the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Ensure project root is on the path so IDEs and runtime both resolve correctly
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
-from rts_portfolio.rts_engine import ReactiveTabuSearch
-from rts_portfolio.fitness import (
+from yahoo_finance_experiment.rts_portfolio.rts_engine import ReactiveTabuSearch
+from yahoo_finance_experiment.rts_portfolio.fitness import (
     repair_weights, calc_annual_return, calc_annual_risk,
-    sharpe_ratio, calc_all_metrics,
+    calc_all_metrics,
 )
 
 
@@ -39,7 +40,7 @@ def download_stock_data():
     """
     Downloads 10 years of real S&P 500 stock data from Yahoo Finance.
     Same period as the target paper: Jan 2013 - Jan 2023.
-    Identical to the function in download_yahoo_finance_data(1).py.
+    Identical to the function in yfdataset.py.
     """
     try:
         import yfinance as yf

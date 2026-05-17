@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import random
 import matplotlib.pyplot as plt
 from tabulate import tabulate
@@ -73,7 +74,7 @@ def download_stock_data():
 
     print("  Downloading data from Yahoo Finance...")
     print(f"  Tickers : {tickers}")
-    print(f"  Period  : Jan 2013 - Jan 2023 (same as target paper)")
+    print("  Period  : Jan 2013 - Jan 2023 (same as target paper)")
 
     raw = yf.download(
         tickers,

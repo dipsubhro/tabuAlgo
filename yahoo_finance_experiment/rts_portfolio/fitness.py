@@ -1,7 +1,7 @@
 """
 Fitness functions and helpers for portfolio optimization.
 Replicates the exact calculations from the RMPSO reference script
-(download_yahoo_finance_data(1).py) so results are directly comparable.
+(yfdataset.py) so results are directly comparable.
 """
 
 import numpy as np
