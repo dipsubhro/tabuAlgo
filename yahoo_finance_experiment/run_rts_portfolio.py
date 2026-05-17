@@ -101,7 +101,7 @@ def download_stock_data():
 def _run_single(args):
     """Run a single RTS instance. Designed for ProcessPoolExecutor."""
     (returns_data, cov_matrix, n_assets, seed, rf,
-     max_iter, neighbors_size, initial_tenure,
+     max_iter, swarm_size, neighbors_size, initial_tenure,
      weight_cap, oscillation_cap) = args
 
     rts = ReactiveTabuSearch(
@@ -110,6 +110,7 @@ def _run_single(args):
         n_assets=n_assets,
         rf=rf,
         max_iter=max_iter,
+        swarm_size=swarm_size,
         neighbors_size=neighbors_size,
         initial_tenure=initial_tenure,
         weight_cap=weight_cap,
@@ -286,15 +287,16 @@ def main():
 
     # ── Step 2: Run RTS ───────────────────────────────────────────
     NUM_RUNS = 30
-    MAX_ITER = 5000
+    MAX_ITER = 2000
+    SWARM_SIZE = 10
     NEIGHBORS = 50
     TENURE = 10
     WEIGHT_CAP = 0.10
     OSC_CAP = 0.15
     SEEDS = list(range(42, 42 + NUM_RUNS))
 
-    print(f"\n  [2] Running Reactive Tabu Search ({NUM_RUNS} runs)...")
-    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, "
+    print(f"\n  [2] Running Multi-Solution Swarm RTS ({NUM_RUNS} runs)...")
+    print(f"      Iterations={MAX_ITER}, Swarm Size={SWARM_SIZE}, Neighbors={NEIGHBORS}, "
           f"Tenure={TENURE}")
     print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, "
           f"Oscillation cap={OSC_CAP*100:.0f}%")
@@ -302,7 +304,7 @@ def main():
     # Build argument tuples for parallel execution
     run_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP)
+         MAX_ITER, SWARM_SIZE, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP)
         for seed in SEEDS
     ]
 
