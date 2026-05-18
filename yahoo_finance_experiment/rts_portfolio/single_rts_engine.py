@@ -28,6 +28,11 @@ from .fitness import (
     repair_weights_capped_2d,
     sharpe_ratio_2d,
 )
+from .repository import (
+    best_by_sharpe,
+    sample_repository_weights,
+    update_repository,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -104,6 +109,7 @@ class SingleReactiveTabuSearch:
         beta=1.5,
         cycle_threshold=3,
         osc_period=None,
+        repository_size=100,
         seed=None,
     ):
         self.returns_data = returns_data
@@ -117,6 +123,7 @@ class SingleReactiveTabuSearch:
         self.oscillation_cap = oscillation_cap
         self.beta = beta
         self.cycle_threshold = cycle_threshold
+        self.repository_size = repository_size
         self.seed = seed
 
         # ── Reactive tenure bounds (Module B) ──
@@ -178,7 +185,7 @@ class SingleReactiveTabuSearch:
         -------
         dict with keys:
             best_weights, best_sharpe, best_return, best_risk,
-            convergence_log, all_explored
+            convergence_log, all_explored, repository
         """
         if self.seed is not None:
             np.random.seed(self.seed)
@@ -191,6 +198,17 @@ class SingleReactiveTabuSearch:
 
         best_weights = current.copy()
         best_sharpe = current_sharpe
+        current_ret = calc_annual_return(current, self.returns_data)
+        current_risk = calc_annual_risk(current, self.cov_matrix)
+        repository = []
+        repository, _ = update_repository(
+            repository,
+            current,
+            current_ret,
+            current_risk,
+            current_sharpe,
+            max_size=self.repository_size,
+        )
 
         # Tabu list: deque of hashes
         tabu_list = deque(maxlen=self.max_tenure * 3)
@@ -247,9 +265,18 @@ class SingleReactiveTabuSearch:
                 cand_s = cand_sharpes[i]
                 cand_h = self._hash(cand_w)
 
+                repository, repo_added = update_repository(
+                    repository,
+                    cand_w,
+                    cand_rets[i],
+                    cand_risks[i],
+                    cand_s,
+                    max_size=self.repository_size,
+                )
+
                 # Track for Pareto plot
                 all_explored.append((cand_risks[i], cand_rets[i], cand_s))
-                neighbors.append((cand_w, cand_s, cand_h))
+                neighbors.append((cand_w, cand_s, cand_h, repo_added))
 
             # Sort descending by Sharpe (maximisation)
             np.random.shuffle(neighbors)  # break ties randomly
@@ -257,9 +284,9 @@ class SingleReactiveTabuSearch:
 
             # ── Module D: Multi-Objective Aspiration Criteria ──────
             accepted = None
-            for cand_w, cand_s, cand_h in neighbors:
-                # Aspiration: if beats global best → override tabu
-                if cand_s > best_sharpe:
+            for cand_w, cand_s, cand_h, repo_added in neighbors:
+                # Aspiration: override tabu if it improves Sharpe or the Pareto repository.
+                if cand_s > best_sharpe or repo_added:
                     accepted = (cand_w, cand_s, cand_h)
                     break
                 # Normal: accept if not tabu
@@ -269,7 +296,7 @@ class SingleReactiveTabuSearch:
 
             # Fallback: if everything is tabu, take the best anyway
             if accepted is None:
-                accepted = neighbors[0]
+                accepted = neighbors[0][:3]
 
             new_weights, new_sharpe, new_hash = accepted
 
@@ -310,9 +337,12 @@ class SingleReactiveTabuSearch:
             # ── Diversification restart if stuck ───────────────────
             if iters_without_improvement >= stagnation_threshold:
                 if diversification_count < max_diversifications:
-                    # Restart near best with large Lévy perturbation
+                    # Restart near a repository trade-off with a large Lévy perturbation.
+                    restart_anchor = sample_repository_weights(repository)
+                    if restart_anchor is None:
+                        restart_anchor = best_weights
                     current = self._generate_neighbor(
-                        best_weights, step_scale * 5.0, use_cap=False
+                        restart_anchor, step_scale * 5.0, use_cap=False
                     )
                     current_sharpe = self._sharpe(current)
 
@@ -340,6 +370,11 @@ class SingleReactiveTabuSearch:
                 )
 
         # ── Final: ensure best weights satisfy hard constraints ────
+        repo_best = best_by_sharpe(repository)
+        if repo_best is not None and repo_best["sharpe"] > best_sharpe:
+            best_weights = repo_best["weights"].copy()
+            best_sharpe = repo_best["sharpe"]
+
         best_weights = repair_weights(best_weights)
         best_sharpe = self._sharpe(best_weights)
 
@@ -353,4 +388,5 @@ class SingleReactiveTabuSearch:
             'best_risk': best_risk,
             'convergence_log': convergence_log,
             'all_explored': all_explored,
+            'repository': repository,
         }
