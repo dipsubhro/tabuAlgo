@@ -308,7 +308,8 @@ def main():
                    tablefmt="fancy_grid"))
 
     # ── Step 2: Run RTS ───────────────────────────────────────────
-    NUM_RUNS = 30
+    NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", "100"))
+    SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "786683"))
     if ALGORITHM == "SWARM":
         MAX_ITER = 2000
         SWARM_SIZE = 10
@@ -319,7 +320,11 @@ def main():
     TENURE = 10
     WEIGHT_CAP = 0.10
     OSC_CAP = 0.15
-    SEEDS = list(range(42, 42 + NUM_RUNS))
+    seed_rng = np.random.default_rng(SEED_POOL_SEED)
+    SEEDS = [
+        int(seed)
+        for seed in seed_rng.choice(1_000_000_000, size=NUM_RUNS, replace=False)
+    ]
 
     print(f"\n  [2] Running {ALGORITHM} RTS ({NUM_RUNS} runs)...")
     if ALGORITHM == "SWARM":
@@ -327,6 +332,7 @@ def main():
     else:
         print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
     print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, Oscillation cap={OSC_CAP*100:.0f}%")
+    print(f"      Seed sweep={NUM_RUNS} wide seeds, pool seed={SEED_POOL_SEED}")
 
     # Build argument tuples for parallel execution
     run_args = [
@@ -464,7 +470,7 @@ def main():
         tablefmt="fancy_grid",
     )
 
-    # Statistics across all 30 runs
+    # Statistics across all configured runs
     stats_rows = [
         ["Mean Sharpe", f"{np.mean(all_sharpes):.4f}"],
         ["Median Sharpe", f"{np.median(all_sharpes):.4f}"],
@@ -482,7 +488,7 @@ def main():
         f.write("=" * 70 + "\n\n")
         f.write(comp_table)
         f.write("\n\n")
-        f.write("RTS Run Statistics (30 runs)\n")
+        f.write(f"RTS Run Statistics ({NUM_RUNS} runs)\n")
         f.write("-" * 40 + "\n")
         f.write(stats_table)
         f.write("\n")
