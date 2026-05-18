@@ -29,6 +29,11 @@ from .fitness import (
     repair_weights_capped_2d,
     sharpe_ratio_2d,
 )
+from .repository import (
+    best_by_sharpe,
+    sample_repository_weights,
+    update_repository,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -106,6 +111,7 @@ class SwarmReactiveTabuSearch:
         beta=1.5,
         cycle_threshold=3,
         osc_period=None,
+        repository_size=100,
         seed=None,
     ):
         self.returns_data = returns_data
@@ -120,6 +126,7 @@ class SwarmReactiveTabuSearch:
         self.oscillation_cap = oscillation_cap
         self.beta = beta
         self.cycle_threshold = cycle_threshold
+        self.repository_size = repository_size
         self.seed = seed
 
         # ── Reactive tenure bounds (Module B) ──
@@ -191,6 +198,7 @@ class SwarmReactiveTabuSearch:
         best_idx = np.argmax(init_s)
         best_weights = current_swarm[best_idx].copy()
         best_sharpe = init_s[best_idx]
+        repository = []
 
         # Global Memory
         tabu_list = {}
@@ -204,6 +212,14 @@ class SwarmReactiveTabuSearch:
         all_explored = []
         for i in range(self.swarm_size):
             all_explored.append((init_risks[i], init_rets[i], init_s[i]))
+            repository, _ = update_repository(
+                repository,
+                current_swarm[i],
+                init_rets[i],
+                init_risks[i],
+                init_s[i],
+                max_size=self.repository_size,
+            )
 
         iters_without_improvement = 0
         stagnation_threshold = max(100, self.max_iter // 10)
@@ -218,6 +234,12 @@ class SwarmReactiveTabuSearch:
                 keys_to_remove = list(tabu_list.keys())[: len(tabu_list) // 2]
                 for k in keys_to_remove:
                     del tabu_list[k]
+                for agent_idx in range(self.swarm_size):
+                    restart_anchor = sample_repository_weights(repository)
+                    if restart_anchor is not None:
+                        current_swarm[agent_idx] = self._generate_neighbor(
+                            restart_anchor, step_scale, use_cap=oscillation_active
+                        )
                 iters_without_improvement = 0
 
             # ── Mass Vectorized Generation for the ENTIRE Swarm ──
@@ -260,11 +282,19 @@ class SwarmReactiveTabuSearch:
                     cand_h = self._hash(cand_w_single)
                     
                     all_explored.append((agent_risks[idx], agent_rets[idx], cand_s_single))
+                    repository, repo_added = update_repository(
+                        repository,
+                        cand_w_single,
+                        agent_rets[idx],
+                        agent_risks[idx],
+                        cand_s_single,
+                        max_size=self.repository_size,
+                    )
                     
                     is_tabu = cand_h in tabu_list and tabu_list[cand_h] >= iteration
                     
                     # Multi-Objective Aspiration
-                    if is_tabu and cand_s_single > best_sharpe:
+                    if is_tabu and (cand_s_single > best_sharpe or repo_added):
                         is_tabu = False
                         
                     if not is_tabu:
@@ -306,6 +336,11 @@ class SwarmReactiveTabuSearch:
                 ))
 
         # Final metrics
+        repo_best = best_by_sharpe(repository)
+        if repo_best is not None and repo_best["sharpe"] > best_sharpe:
+            best_sharpe = repo_best["sharpe"]
+            best_weights = repo_best["weights"].copy()
+
         final_metrics = calc_all_metrics(
             best_weights, self.returns_data, self.cov_matrix, self.rf
         )
@@ -316,5 +351,6 @@ class SwarmReactiveTabuSearch:
         final_metrics['best_weights'] = best_weights
         final_metrics['convergence_log'] = convergence_log
         final_metrics['all_explored'] = all_explored
+        final_metrics['repository'] = repository
 
         return final_metrics
