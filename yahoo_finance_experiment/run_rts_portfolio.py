@@ -55,7 +55,7 @@ def download_stock_data():
     import pandas as pd
 
     tickers = [
-        'AAPL',   # Apple         — Technology
+        'AAPL',   # Apple         — Technology``
         'MSFT',   # Microsoft     — Technology
         'GOOGL',  # Alphabet      — Technology
         'AMZN',   # Amazon        — Consumer
