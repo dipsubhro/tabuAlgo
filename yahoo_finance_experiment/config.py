@@ -117,10 +117,6 @@ DATA_DIR = os.path.join(_HERE, "data")
 # Unified close prices — combined from individual ticker CSVs (all positive values)
 # Run scripts/generate_dataset.py to rebuild from data/<TICKER>.csv files.
 COMBINED_PRICES_CSV = os.path.join(DATA_DIR, "combined_prices.csv")
-
-# Pre-built daily returns (pct_change of combined_prices.csv) — auto-generated
-DATASET_CSV = os.path.join(DATA_DIR, "dataset.csv")
-
 # Per-ticker OHLCV CSVs (from data1.zip)
 TICKER_CSV = {t: os.path.join(DATA_DIR, f"{t}.csv") for t in TICKERS}
 
