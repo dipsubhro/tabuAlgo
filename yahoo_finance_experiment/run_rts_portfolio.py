@@ -674,32 +674,47 @@ def main():
     print("\n  " + "=" * 70)
     print("  BEST PORTFOLIO — STOCK-LEVEL ALLOCATION DETAIL")
     print("  " + "=" * 70)
+
+    STOCK_FULL_NAMES = {
+        'AAPL': 'Apple Inc.',
+        'MSFT': 'Microsoft Corporation',
+        'GOOGL': 'Alphabet Inc.',
+        'AMZN': 'Amazon.com, Inc.',
+        'JPM': 'JPMorgan Chase & Co.',
+        'JNJ': 'Johnson & Johnson',
+        'V': 'Visa Inc.',
+        'PG': 'The Procter & Gamble Company',
+        'XOM': 'Exxon Mobil Corporation',
+        'NVDA': 'NVIDIA Corporation',
+    }
+
     alloc_rows = []
-    total_alloc = 0.0
     for name, w, r_ann, v_ann in zip(
             stock_names, best_result['best_weights'], mean_returns, std_returns):
-        if w <= 0.001:
-            continue
         ind_sharpe = (r_ann - RF) / v_ann if v_ann > 0 else float('nan')
-        alloc_rows.append([
-            name,
-            f"{w*100:.2f}%",
-            f"{r_ann*100:.2f}%",
-            f"{v_ann*100:.2f}%",
-            f"{ind_sharpe:.3f}",
-        ])
-        total_alloc += w
-    alloc_rows.append([
-        "── TOTAL / PORTFOLIO",
-        f"{total_alloc*100:.2f}%",
-        f"{best_result['best_return']*100:.2f}%",
-        f"{best_result['best_risk']*100:.2f}%",
-        f"{best_result['best_sharpe']:.3f}",
-    ])
+        full_name = STOCK_FULL_NAMES.get(name, name)
+        alloc_rows.append({
+            'ticker': name,
+            'name': full_name,
+            'alloc_val': w,
+            'alloc_str': f"{w*100:.2f}%",
+            'ret_str': f"{r_ann*100:.2f}%",
+            'risk_str': f"{v_ann*100:.2f}%",
+            'sharpe_val': round(ind_sharpe, 4),
+        })
+
+    # Sort by allocation descending
+    alloc_rows.sort(key=lambda x: x['alloc_val'], reverse=True)
+
+    final_alloc_rows = [
+        [r['ticker'], r['name'], r['alloc_str'], r['ret_str'], r['risk_str'], r['sharpe_val']]
+        for r in alloc_rows
+    ]
+
     alloc_table_str = tabulate(
-        alloc_rows,
-        headers=["Stock", "Allocation %", "Ann. Return", "Ann. Risk", "Indiv. Sharpe"],
-        tablefmt="fancy_grid",
+        final_alloc_rows,
+        headers=["Ticker", "Stock Name", "Allocation", "Stock Return", "Stock Risk", "Stock Sharpe"],
+        tablefmt="pipe",
     )
     print(alloc_table_str)
 
