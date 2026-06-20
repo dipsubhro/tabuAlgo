@@ -11,8 +11,9 @@ import os
 # ALGORITHM SELECTOR
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Options: "SINGLE" or "SWARM"
-ALGORITHM = "SINGLE"
+# Options: "SINGLE"  — Reactive Tabu Search (Lévy + Reactive Tenure + Oscillation)
+#           "NORMAL"  — Standard Tabu Search (baseline, no enhancements)
+ALGORITHM = "NORMAL"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA / UNIVERSE
@@ -51,15 +52,15 @@ RF = 0.02
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Number of independent runs (different random seeds)
-NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", "30"))
+# NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", "30"))
+NUM_RUNS = 30
 
 # Seed used to generate the per-run seed pool (reproducibility)
 SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "786683"))
 
 # --- Iterations ---
 # Number of search steps per run
-MAX_ITER_SINGLE = 3000   # SingleReactiveTabuSearch
-MAX_ITER_SWARM  = 2000   # SwarmReactiveTabuSearch
+MAX_ITER = 3000   # applies to both SINGLE and NORMAL
 
 # --- Neighbourhood ---
 # Number of candidate neighbours generated each iteration
@@ -78,9 +79,6 @@ TENURE = 10
 # --- Reactive Tenure / Diversification (Module B) ---
 # How many revisits to the same hash trigger a tenure increase
 CYCLE_THRESHOLD = 3
-
-# --- Swarm (only used when ALGORITHM = "SWARM") ---
-SWARM_SIZE = 10   # number of parallel solutions in the swarm
 
 # --- Portfolio Constraints ---
 # Maximum weight any single asset can hold (10% cap)
@@ -107,15 +105,33 @@ PAPER_RESULTS = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
-# OUTPUT PATHS
+# PATHS
 # ═══════════════════════════════════════════════════════════════════════════
 
-# CSV dataset path (relative to yahoo_finance_experiment/)
-# Run generate_dataset.py once to create this file.
-# The runner loads from CSV if it exists; downloads & saves if not.
-DATASET_CSV = "dataset.csv"
+# Base directory of this config file (yahoo_finance_experiment/)
+_HERE = os.path.dirname(os.path.abspath(__file__))
 
-OUT_CONVERGENCE_TXT   = "rts_convergence.txt"
-OUT_COMPARISON_TXT    = "rts_comparison.txt"
-OUT_PARETO_PNG        = "rts_pareto_front.png"
-OUT_CONVERGENCE_GRAPH = "rts_convergence_graphs.png"
+# ── Data directory ──────────────────────────────────────────────────────────
+DATA_DIR = os.path.join(_HERE, "data")
+
+# Unified close prices — combined from individual ticker CSVs (all positive values)
+# Run scripts/generate_dataset.py to rebuild from data/<TICKER>.csv files.
+COMBINED_PRICES_CSV = os.path.join(DATA_DIR, "combined_prices.csv")
+
+# Pre-built daily returns (pct_change of combined_prices.csv) — auto-generated
+DATASET_CSV = os.path.join(DATA_DIR, "dataset.csv")
+
+# Per-ticker OHLCV CSVs (from data1.zip)
+TICKER_CSV = {t: os.path.join(DATA_DIR, f"{t}.csv") for t in TICKERS}
+
+# ── Outputs directory ────────────────────────────────────────────────────────
+OUTPUTS_DIR = os.path.join(_HERE, "outputs")
+
+# Text reports — written to outputs/
+OUT_CONVERGENCE_TXT   = os.path.join(OUTPUTS_DIR, "rts_convergence.txt")
+OUT_COMPARISON_TXT    = os.path.join(OUTPUTS_DIR, "rts_comparison.txt")
+OUT_COMPARISON_NORMAL = os.path.join(OUTPUTS_DIR, "tabu_normal_vs_optimized.txt")
+
+# Plots — written to outputs/
+OUT_PARETO_PNG        = os.path.join(OUTPUTS_DIR, "rts_pareto_front.png")
+OUT_CONVERGENCE_GRAPH = os.path.join(OUTPUTS_DIR, "rts_convergence_graphs.png")

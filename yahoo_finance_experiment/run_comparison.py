@@ -12,7 +12,7 @@ Uses 30 S&P 500 stocks to create a harder optimization problem
 where the optimized enhancements actually matter.
 
 Outputs:
-  - tabu_normal_vs_optimized.txt  (full comparison report)
+  - outputs/tabu_normal_vs_optimized.txt  (full comparison report)
 """
 
 import sys
@@ -37,6 +37,7 @@ from yahoo_finance_experiment.rts_portfolio.fitness import (
     repair_weights, calc_annual_return, calc_annual_risk,
     calc_all_metrics,
 )
+import yahoo_finance_experiment.config as cfg
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -249,8 +250,8 @@ def main():
     std_metrics = calc_all_metrics(std_best['best_weights'], returns_data, cov_daily, RF)
     opt_metrics = calc_all_metrics(opt_best['best_weights'], returns_data, cov_daily, RF)
 
-    # ── Build output text ─────────────────────────────────────────
-    output_path = "tabu_normal_vs_optimized.txt"
+    # ── Build output text ─────────────────────────────────────────────
+    output_path = cfg.OUT_COMPARISON_NORMAL
     lines = []
 
     lines.append("=" * 80)

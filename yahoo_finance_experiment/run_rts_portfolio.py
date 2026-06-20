@@ -12,14 +12,17 @@ warnings.filterwarnings('ignore')
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from yahoo_finance_experiment.rts_portfolio import SingleReactiveTabuSearch, SwarmReactiveTabuSearch
+from yahoo_finance_experiment.rts_portfolio import SingleReactiveTabuSearch
+from yahoo_finance_experiment.rts_portfolio import StandardTabuSearch
 from yahoo_finance_experiment.rts_portfolio.fitness import (
     repair_weights, calc_annual_return, calc_annual_risk,
     calc_all_metrics,
 )
 import yahoo_finance_experiment.config as cfg
 
-# ── ALGORITHM SELECTOR (edit config.py to change) ──
+# ── ALGORITHM SELECTOR: edit ALGORITHM in config.py ──
+#    "SINGLE" = Reactive Tabu Search  (Lévy + Reactive Tenure + Oscillation)
+#    "NORMAL" = Standard Tabu Search  (baseline, fixed tenure, Gaussian steps)
 ALGORITHM = cfg.ALGORITHM
 
 
@@ -29,41 +32,49 @@ ALGORITHM = cfg.ALGORITHM
 
 def load_stock_data():
     """
-    Load daily returns data for the configured stock universe.
+    Load daily returns for the configured stock universe.
 
-    Priority:
-      1. Load from CSV (cfg.DATASET_CSV) if it already exists — fast & reproducible.
-      2. Download from Yahoo Finance, then save CSV for future runs.
+    Source: data/combined_prices.csv  — unified close prices (all positive),
+            built by combining the Close column from each per-ticker CSV.
+
+    The function reads the close prices and computes pct_change() internally
+    so the algorithm always works from the cleanest source data.
+
+    Falls back to downloading from Yahoo Finance if combined_prices.csv is
+    missing and no individual ticker CSVs are present.
 
     Returns
     -------
-    stock_names : list[str]
+    stock_names   : list[str]
     returns_array : np.ndarray  shape (trading_days, n_assets)
     """
     import pandas as pd
 
-    # Resolve path relative to this file's directory
-    csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), cfg.DATASET_CSV)
+    combined_path = cfg.COMBINED_PRICES_CSV
 
-    if os.path.exists(csv_path):
-        # ── Load from CSV ──────────────────────────────────────────
-        print(f"  Loading dataset from CSV: {cfg.DATASET_CSV}")
-        returns = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+    if os.path.exists(combined_path):
+        # ── Load unified close prices & compute returns ────────────
+        print(f"  Loading combined close prices: {combined_path}")
+        close = pd.read_csv(combined_path, index_col=0, parse_dates=True)
+        print(f"  ✓ Close prices : {close.shape[1]} tickers, {close.shape[0]} rows")
+        print(f"  ✓ Date range   : {close.index[0].date()} → {close.index[-1].date()}")
+
+        # Compute daily returns from close prices
+        returns       = close.pct_change().dropna()
         stock_names   = list(returns.columns)
         returns_array = returns.values
-        print(f"  ✓ Loaded   : {len(stock_names)} stocks")
-        print(f"  ✓ Trading days: {len(returns_array)}")
-        print(f"  ✓ Date range  : {returns.index[0].date()} → {returns.index[-1].date()}")
+
+        print(f"  ✓ Daily returns: {returns.shape[0]} trading days")
 
     else:
-        # ── Download from Yahoo Finance & save CSV ─────────────────
+        # ── Fallback: download from Yahoo Finance ──────────────────
         try:
             import yfinance as yf
         except ImportError:
             print("  [!] yfinance not installed. Run: uv add yfinance")
             sys.exit(1)
 
-        print("  dataset.csv not found — downloading from Yahoo Finance...")
+        print("  combined_prices.csv not found — downloading from Yahoo Finance...")
         print(f"  Tickers : {cfg.TICKERS}")
         print(f"  Period  : {cfg.DATA_START} → {cfg.DATA_END}")
 
@@ -75,26 +86,23 @@ def load_stock_data():
             progress=False,
         )
 
-        if isinstance(raw.columns, pd.MultiIndex):
-            data = raw['Close']
-        else:
-            data = raw
+        close = raw['Close'] if isinstance(raw.columns, pd.MultiIndex) else raw
+        close = close.dropna(axis=1, thresh=int(cfg.DATA_COVERAGE_THRESHOLD * len(close)))
+        close = close.dropna()
 
-        data = data.dropna(axis=1, thresh=int(cfg.DATA_COVERAGE_THRESHOLD * len(data)))
-        data = data.dropna()
+        # Save as combined_prices.csv for future runs
+        os.makedirs(os.path.dirname(combined_path), exist_ok=True)
+        close.to_csv(combined_path)
+        print(f"  ✓ Saved combined_prices.csv: {combined_path}")
 
-        returns       = data.pct_change().dropna()
+        returns       = close.pct_change().dropna()
         stock_names   = list(returns.columns)
         returns_array = returns.values
 
-        # Save for future runs
-        returns.to_csv(csv_path)
-        print(f"  ✓ Downloaded : {len(stock_names)} stocks")
-        print(f"  ✓ Trading days: {len(returns_array)}")
-        print(f"  ✓ Date range  : {returns.index[0].date()} → {returns.index[-1].date()}")
-        print(f"  ✓ Saved CSV  : {csv_path}  (will be reused on next run)")
+        print(f"  ✓ Downloaded : {len(stock_names)} stocks, {len(returns_array)} trading days")
 
     return stock_names, returns_array
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -102,27 +110,24 @@ def load_stock_data():
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _run_single(args):
-    """Run a single RTS instance. Designed for ProcessPoolExecutor."""
+    """Run one search instance. Works for both SINGLE and NORMAL."""
     (returns_data, cov_matrix, n_assets, seed, rf,
-     max_iter, swarm_size, neighbors_size, initial_tenure,
+     max_iter, neighbors_size, initial_tenure,
      weight_cap, oscillation_cap, algo_type,
      beta, cycle_threshold) = args
 
-    if algo_type == "SWARM":
-        rts = SwarmReactiveTabuSearch(
+    if algo_type == "NORMAL":
+        rts = StandardTabuSearch(
             returns_data=returns_data,
             cov_matrix=cov_matrix,
             n_assets=n_assets,
             rf=rf,
             max_iter=max_iter,
-            swarm_size=swarm_size,
             neighbors_size=neighbors_size,
-            initial_tenure=initial_tenure,
-            weight_cap=weight_cap,
-            oscillation_cap=oscillation_cap,
+            tenure=initial_tenure,
             seed=seed,
         )
-    else:
+    else:  # "SINGLE"
         rts = SingleReactiveTabuSearch(
             returns_data=returns_data,
             cov_matrix=cov_matrix,
@@ -365,7 +370,7 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
     iters_b  = [e[0] for e in best_log]
     sharpe_b = [e[1] for e in best_log]
     curr_b   = [e[2] for e in best_log]
-    tenure_b = [e[3] for e in best_log]
+    tenure_b = [e[3] if len(e) > 3 else cfg.TENURE for e in best_log]
 
     ax2.plot(iters_b, sharpe_b, color=PALETTE['best'],
              linewidth=2.0, label='Best Sharpe')
@@ -508,13 +513,13 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
 
 def main():
     print("\n" + "=" * 70)
-    if ALGORITHM == "SWARM":
-        print("  MULTI-SOLUTION SWARM RTS — S&P 500 Portfolio Optimization")
-        print("  Modules: Lévy Flight | Swarm Memory | Strategic Oscillation")
+    if ALGORITHM == "NORMAL":
+        print("  STANDARD TABU SEARCH — S&P 500 Portfolio Optimization")
+        print("  Baseline: fixed tenure, Gaussian neighbourhood, no enhancements")
     else:
-        print("  SINGLE-SOLUTION RTS — S&P 500 Portfolio Optimization")
+        print("  SINGLE-SOLUTION REACTIVE TABU SEARCH — S&P 500 Portfolio Optimization")
         print("  Modules: Lévy Flight | Reactive Tenure | Strategic Oscillation")
-    print("           | Multi-Objective Aspiration")
+        print("           | Multi-Objective Aspiration")
     print("  Dataset: S&P 500, Jan 2013 – Jan 2023")
     print("=" * 70)
 
@@ -544,35 +549,25 @@ def main():
                    tablefmt="fancy_grid"))
 
     # ── Step 2: Run RTS ───────────────────────────────────────────
-    NUM_RUNS      = cfg.NUM_RUNS
+    NUM_RUNS       = cfg.NUM_RUNS
     SEED_POOL_SEED = cfg.SEED_POOL_SEED
-    if ALGORITHM == "SWARM":
-        MAX_ITER   = cfg.MAX_ITER_SWARM
-        SWARM_SIZE = cfg.SWARM_SIZE
-    else:
-        MAX_ITER   = cfg.MAX_ITER_SINGLE
-        SWARM_SIZE = 1
-    NEIGHBORS  = cfg.NEIGHBORS
-    TENURE     = cfg.TENURE
-    WEIGHT_CAP = cfg.WEIGHT_CAP
-    OSC_CAP    = cfg.OSC_CAP
-    print(f"\n  [2] Running {ALGORITHM} RTS ({NUM_RUNS} runs)...")
-    if ALGORITHM == "SWARM":
-        print(f"      Iterations={MAX_ITER}, Swarm Size={SWARM_SIZE}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
-    else:
-        print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
+    MAX_ITER       = cfg.MAX_ITER
+    NEIGHBORS      = cfg.NEIGHBORS
+    TENURE         = cfg.TENURE
+    WEIGHT_CAP     = cfg.WEIGHT_CAP
+    OSC_CAP        = cfg.OSC_CAP
+
+    print(f"\n  [2] Running {ALGORITHM} ({NUM_RUNS} runs)...")
+    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
     print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, Oscillation cap={OSC_CAP*100:.0f}%")
-    print(f"      Seed sweep={NUM_RUNS} wide seeds, pool seed={SEED_POOL_SEED}")
+    print(f"      Seed pool seed={SEED_POOL_SEED}")
 
     seed_rng = np.random.default_rng(SEED_POOL_SEED)
-    SEEDS = [
-         int(seed)
-        for seed in seed_rng.choice(1_000_000_000, size=NUM_RUNS, replace=False)
-    ]
-    # Build argument tuples for parallel execution
+    SEEDS = [int(s) for s in seed_rng.choice(1_000_000_000, size=NUM_RUNS, replace=False)]
+
     run_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, SWARM_SIZE, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP, ALGORITHM,
+         MAX_ITER, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP, ALGORITHM,
          cfg.LEVY_BETA, cfg.CYCLE_THRESHOLD)
         for seed in SEEDS
     ]
@@ -723,7 +718,13 @@ def main():
     best_conv = best_result['convergence_log']
 
     conv_rows = []
-    for (it, b_sharpe, c_sharpe, ten, phase) in best_conv:
+    for entry in best_conv:
+        it = entry[0]
+        b_sharpe = entry[1]
+        c_sharpe = entry[2]
+        ten = entry[3] if len(entry) > 3 else cfg.TENURE
+        phase = entry[4] if len(entry) > 4 else "Normal"
+        
         conv_rows.append([it, f"{b_sharpe:.4f}", f"{c_sharpe:.4f}",
                           ten, phase])
 

@@ -4,16 +4,31 @@ Generate the Yahoo Finance dataset used by the portfolio algorithms.
 This script uses the same tickers, date range, adjustment setting, cleanup,
 and daily-return calculation as yfdataset.py, then writes the result as a
 plain text table.
+
+Usage:
+    uv run python -m yahoo_finance_experiment.scripts.generate_yfdataset_table
+
+Output:
+    yahoo_finance_experiment/data/yfdataset_table.txt
 """
 
 import sys
+import os
 from pathlib import Path
+
+# scripts/ is one level deeper than the package root, so go up two levels
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_PKG_DIR     = _SCRIPTS_DIR.parent          # yahoo_finance_experiment/
+_DATA_DIR    = _PKG_DIR / "data"
+project_root = str(_PKG_DIR.parent)          # tabu/
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+OUTPUT_FILE = _DATA_DIR / "yfdataset_table.txt"
 
 import pandas as pd
 from tabulate import tabulate
 
-
-OUTPUT_FILE = Path("yfdataset_table.txt")
 START_DATE = "2013-01-01"
 END_DATE = "2023-01-01"
 
@@ -70,6 +85,7 @@ def write_table(returns):
     table = returns.reset_index()
     table["Date"] = table["Date"].dt.date
 
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_FILE.open("w", encoding="utf-8") as file:
         file.write("Yahoo Finance Portfolio Dataset\n")
         file.write("================================\n")
