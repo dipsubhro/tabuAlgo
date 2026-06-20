@@ -21,8 +21,8 @@ from yahoo_finance_experiment.rts_portfolio.fitness import (
 import yahoo_finance_experiment.config as cfg
 
 # ── ALGORITHM SELECTOR: edit ALGORITHM in config.py ──
-#    "SINGLE" = Reactive Tabu Search  (Lévy + Reactive Tenure + Oscillation)
-#    "NORMAL" = Standard Tabu Search  (baseline, fixed tenure, Gaussian steps)
+#    "RTS" = Reactive Tabu Search  (Lévy + Reactive Tenure + Oscillation)
+#    "STS" = Standard Tabu Search  (baseline, fixed tenure, Gaussian steps)
 ALGORITHM = cfg.ALGORITHM
 
 
@@ -110,13 +110,11 @@ def load_stock_data():
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _run_single(args):
-    """Run one search instance. Works for both SINGLE and NORMAL."""
+    """Run one search instance. Works for both RTS and STS."""
     (returns_data, cov_matrix, n_assets, seed, rf,
-     max_iter, neighbors_size, initial_tenure,
-     weight_cap, oscillation_cap, algo_type,
-     beta, cycle_threshold) = args
+     max_iter, neighbors_size, algo_type) = args
 
-    if algo_type == "NORMAL":
+    if algo_type == "STS":
         rts = StandardTabuSearch(
             returns_data=returns_data,
             cov_matrix=cov_matrix,
@@ -124,10 +122,11 @@ def _run_single(args):
             rf=rf,
             max_iter=max_iter,
             neighbors_size=neighbors_size,
-            tenure=initial_tenure,
+            tenure=cfg.STS_TENURE,
+            step_scale=cfg.STS_STEP_SCALE,
             seed=seed,
         )
-    else:  # "SINGLE"
+    else:  # "RTS"
         rts = SingleReactiveTabuSearch(
             returns_data=returns_data,
             cov_matrix=cov_matrix,
@@ -135,11 +134,11 @@ def _run_single(args):
             rf=rf,
             max_iter=max_iter,
             neighbors_size=neighbors_size,
-            initial_tenure=initial_tenure,
-            weight_cap=weight_cap,
-            oscillation_cap=oscillation_cap,
-            beta=beta,
-            cycle_threshold=cycle_threshold,
+            initial_tenure=cfg.RTS_INITIAL_TENURE,
+            weight_cap=cfg.RTS_WEIGHT_CAP,
+            oscillation_cap=cfg.RTS_OSC_CAP,
+            beta=cfg.RTS_LEVY_BETA,
+            cycle_threshold=cfg.RTS_CYCLE_THRESHOLD,
             seed=seed,
         )
     return rts.run()
@@ -174,7 +173,6 @@ def _build_pareto_front(points):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def plot_pareto_front(all_explored, pareto_front, best_result,
-                      rmpso_ref, cso_ref,
                       returns_data, cov_matrix, n_assets, rf,
                       output_path=None):
     """
@@ -208,45 +206,25 @@ def plot_pareto_front(all_explored, pareto_front, best_result,
         explored = explored[idx]
     ax.scatter(explored[:, 0] * 100, explored[:, 1] * 100,
                alpha=0.06, s=4, color='#3498db',
-               label='RTS Explored Solutions', zorder=2)
+               label=f'{ALGORITHM} Explored Solutions', zorder=2)
 
     # ── Pareto front line ──────────────────────────────────────────
     pf = np.array(pareto_front)
     sort_idx = np.argsort(pf[:, 0])
     ax.plot(pf[sort_idx, 0] * 100, pf[sort_idx, 1] * 100,
             'o-', color='#e74c3c', markersize=5, linewidth=2.5,
-            label='RTS Pareto Front', zorder=5)
+            label=f'{ALGORITHM} Pareto Front', zorder=5)
 
     # ── Best RTS solution (max Sharpe) ─────────────────────────────
     ax.scatter(best_result['best_risk'] * 100,
                best_result['best_return'] * 100,
                marker='*', s=400, color='#e74c3c', edgecolors='black',
                linewidths=1.5, zorder=7,
-               label=f"★ RTS Best (Sharpe={best_result['best_sharpe']:.3f})")
+               label=f"★ {ALGORITHM} Best (Sharpe={best_result['best_sharpe']:.3f})")
 
-    # ── RMPSO reference point ──────────────────────────────────────
-    if rmpso_ref:
-        ax.scatter(rmpso_ref['risk'] * 100, rmpso_ref['return'] * 100,
-                   marker='D', s=180, color='#2ecc71', edgecolors='black',
-                   linewidths=1.5, zorder=6,
-                   label=f"RMPSO (Sharpe={rmpso_ref['sharpe']:.3f})")
-        ax.annotate('RMPSO', (rmpso_ref['risk'] * 100, rmpso_ref['return'] * 100),
-                    textcoords='offset points', xytext=(8, -12),
-                    fontsize=9, fontweight='bold', color='#27ae60')
-
-    # ── CSO reference point ────────────────────────────────────────
-    if cso_ref:
-        ax.scatter(cso_ref['risk'] * 100, cso_ref['return'] * 100,
-                   marker='X', s=180, color='#9b59b6', edgecolors='black',
-                   linewidths=1.5, zorder=6,
-                   label=f"CSO (Sharpe={cso_ref['sharpe']:.3f})")
-        ax.annotate('CSO', (cso_ref['risk'] * 100, cso_ref['return'] * 100),
-                    textcoords='offset points', xytext=(8, 5),
-                    fontsize=9, fontweight='bold', color='#8e44ad')
-
-    # ── Annotate best RTS point ────────────────────────────────────
+    # ── Annotate best point ────────────────────────────────────
     ax.annotate(
-        f"RTS Best ★\n"
+        f"{ALGORITHM} Best ★\n"
         f"Return: {best_result['best_return']*100:.2f}%\n"
         f"Risk: {best_result['best_risk']*100:.2f}%\n"
         f"Sharpe: {best_result['best_sharpe']:.4f}",
@@ -262,7 +240,7 @@ def plot_pareto_front(all_explored, pareto_front, best_result,
     ax.set_xlabel('Annual Risk / Volatility (%)', fontsize=13, fontweight='bold')
     ax.set_ylabel('Expected Annual Return (%)', fontsize=13, fontweight='bold')
     ax.set_title(
-        'Reactive Tabu Search — Pareto Front (Risk vs Return)\n'
+        f'{ALGORITHM} — Pareto Front (Risk vs Return)\n'
         'S&P 500 Portfolio | Jan 2013 – Jan 2023 | Rf = 2%',
         fontsize=15, fontweight='bold', pad=12,
     )
@@ -370,7 +348,7 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
     iters_b  = [e[0] for e in best_log]
     sharpe_b = [e[1] for e in best_log]
     curr_b   = [e[2] for e in best_log]
-    tenure_b = [e[3] if len(e) > 3 else cfg.TENURE for e in best_log]
+    tenure_b = [e[3] if len(e) > 3 else (cfg.RTS_INITIAL_TENURE if ALGORITHM=="RTS" else cfg.STS_TENURE) for e in best_log]
 
     ax2.plot(iters_b, sharpe_b, color=PALETTE['best'],
              linewidth=2.0, label='Best Sharpe')
@@ -495,7 +473,7 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
 
     # ── Super title ─────────────────────────────────────────────────
     fig.suptitle(
-        'Reactive Tabu Search — Convergence & Run Analysis\n'
+        f'{ALGORITHM} — Convergence & Run Analysis\n'
         'S&P 500 Portfolio | Jan 2013 – Jan 2023',
         fontsize=16, fontweight='bold',
         color=PALETTE['text'], y=0.975,
@@ -513,11 +491,11 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
 
 def main():
     print("\n" + "=" * 70)
-    if ALGORITHM == "NORMAL":
-        print("  STANDARD TABU SEARCH — S&P 500 Portfolio Optimization")
+    if ALGORITHM == "STS":
+        print("  STANDARD TABU SEARCH (STS) — S&P 500 Portfolio Optimization")
         print("  Baseline: fixed tenure, Gaussian neighbourhood, no enhancements")
     else:
-        print("  SINGLE-SOLUTION REACTIVE TABU SEARCH — S&P 500 Portfolio Optimization")
+        print("  REACTIVE TABU SEARCH (RTS) — S&P 500 Portfolio Optimization")
         print("  Modules: Lévy Flight | Reactive Tenure | Strategic Oscillation")
         print("           | Multi-Objective Aspiration")
     print("  Dataset: S&P 500, Jan 2013 – Jan 2023")
@@ -553,13 +531,13 @@ def main():
     SEED_POOL_SEED = cfg.SEED_POOL_SEED
     MAX_ITER       = cfg.MAX_ITER
     NEIGHBORS      = cfg.NEIGHBORS
-    TENURE         = cfg.TENURE
-    WEIGHT_CAP     = cfg.WEIGHT_CAP
-    OSC_CAP        = cfg.OSC_CAP
 
     print(f"\n  [2] Running {ALGORITHM} ({NUM_RUNS} runs)...")
-    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
-    print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, Oscillation cap={OSC_CAP*100:.0f}%")
+    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}")
+    if ALGORITHM == "RTS":
+        print(f"      Tenure={cfg.RTS_INITIAL_TENURE}, Weight cap={cfg.RTS_WEIGHT_CAP*100:.0f}%, Oscillation cap={cfg.RTS_OSC_CAP*100:.0f}%")
+    else:
+        print(f"      Tenure={cfg.STS_TENURE}, Step scale={cfg.STS_STEP_SCALE:.2f}")
     print(f"      Seed pool seed={SEED_POOL_SEED}")
 
     seed_rng = np.random.default_rng(SEED_POOL_SEED)
@@ -567,8 +545,7 @@ def main():
 
     run_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP, ALGORITHM,
-         cfg.LEVY_BETA, cfg.CYCLE_THRESHOLD)
+         MAX_ITER, NEIGHBORS, ALGORITHM)
         for seed in SEEDS
     ]
 
@@ -722,7 +699,7 @@ def main():
         it = entry[0]
         b_sharpe = entry[1]
         c_sharpe = entry[2]
-        ten = entry[3] if len(entry) > 3 else cfg.TENURE
+        ten = entry[3] if len(entry) > 3 else (cfg.RTS_INITIAL_TENURE if ALGORITHM=="RTS" else cfg.STS_TENURE)
         phase = entry[4] if len(entry) > 4 else "Normal"
         
         conv_rows.append([it, f"{b_sharpe:.4f}", f"{c_sharpe:.4f}",
@@ -736,7 +713,7 @@ def main():
     )
 
     with open(cfg.OUT_CONVERGENCE_TXT, "w") as f:
-        f.write("Reactive Tabu Search — Convergence Log\n")
+        f.write(f"{ALGORITHM} — Convergence Log\n")
         f.write(f"Best Run (Seed {SEEDS[best_idx]})\n")
         f.write("=" * 70 + "\n\n")
         f.write(conv_table)
@@ -744,44 +721,22 @@ def main():
     print(f"  [✓] Convergence table saved: {cfg.OUT_CONVERGENCE_TXT}")
 
     # ── Step 6: OUTPUT 2 — Comparative Verdict ────────────────────
-    print("\n  [4] Building comparison table...")
-
-    # Published reference values (edit config.py to change)
-    cso_ref       = cfg.CSO_REF
-    paper_results = cfg.PAPER_RESULTS
+    # ── Step 6: OUTPUT 2 — Final Metrics ────────────────────
+    print("\n  [4] Building summary table...")
 
     comparison_rows = []
-
-    # Paper methods
-    for method, m in paper_results.items():
-        comparison_rows.append([
-            f"{method} (paper)",
-            f"{m['return']*100:.2f}%",
-            f"{m['risk']*100:.2f}%",
-            f"{m['sharpe']:.4f}",
-            "—",
-            "Published",
-        ])
-
-    # Our RTS
-    if rts_metrics['sharpe'] > cso_ref['sharpe']:
-        verdict = "★ Beats CSO (Best Paper)"
-    else:
-        verdict = "—"
-
     comparison_rows.append([
-        "★ RTS (Ours)",
+        f"★ {ALGORITHM} (Ours)",
         f"{rts_metrics['return']*100:.2f}%",
         f"{rts_metrics['risk']*100:.2f}%",
         f"{rts_metrics['sharpe']:.4f}",
         f"{rts_metrics['max_drawdown']*100:.2f}%",
-        verdict,
     ])
 
     comp_table = tabulate(
         comparison_rows,
         headers=["Algorithm", "Annual Return", "Annual Risk",
-                 "Sharpe Ratio", "Max Drawdown", "Verdict"],
+                 "Sharpe Ratio", "Max Drawdown"],
         tablefmt="fancy_grid",
     )
 
@@ -835,7 +790,7 @@ def main():
     )
 
     with open(cfg.OUT_COMPARISON_TXT, "w") as f:
-        f.write("Reactive Tabu Search — Comparative Verdict\n")
+        f.write(f"{ALGORITHM} — Final Metrics\n")
         f.write("Dataset: S&P 500 Top 10 Stocks | "
                 "Period: 2013–2023 | RF=2%\n")
         f.write("=" * 70 + "\n\n")
@@ -845,7 +800,7 @@ def main():
         f.write("-" * 60 + "\n")
         f.write(alloc_table_str)
         f.write("\n\n")
-        f.write(f"RTS Run Statistics ({NUM_RUNS} runs) — All Metrics\n")
+        f.write(f"{ALGORITHM} Run Statistics ({NUM_RUNS} runs) — All Metrics\n")
         f.write("-" * 60 + "\n")
         f.write(full_stats_table)
         f.write("\n\n")
@@ -855,7 +810,7 @@ def main():
         f.write("\n")
 
     print(comp_table)
-    print(f"\n  [✓] Comparison table saved: {cfg.OUT_COMPARISON_TXT}")
+    print(f"\n  [✓] Summary table saved: {cfg.OUT_COMPARISON_TXT}")
 
     # ── Step 7: OUTPUT 3 — Pareto Front Plot ──────────────────────
     print("\n  [5] Generating Pareto front plot...")
@@ -869,7 +824,6 @@ def main():
 
     plot_pareto_front(
         all_explored, pareto_front, best_result,
-        None, cso_ref,
         returns_data, cov_daily, n_assets, RF,
     )
 
@@ -879,18 +833,8 @@ def main():
 
     # ── Final Summary ─────────────────────────────────────────────
     print("\n" + "=" * 70)
-    print("  REACTIVE TABU SEARCH — COMPLETE!")
-    print(f"  RTS Best Sharpe   = {best_result['best_sharpe']:.4f}")
-    print(f"  CSO (Paper Best)  = {cso_ref['sharpe']:.4f}")
-
-    improvement_cso = ((rts_metrics['sharpe'] - cso_ref['sharpe'])
-                       / cso_ref['sharpe'] * 100)
-
-    if improvement_cso > 0:
-        print(f"  vs CSO            : +{improvement_cso:.2f}% ✅")
-    else:
-        print(f"  vs CSO            : {improvement_cso:.2f}%")
-
+    print(f"  {ALGORITHM} — COMPLETE!")
+    print(f"  {ALGORITHM} Best Sharpe   = {best_result['best_sharpe']:.4f}")
     print("=" * 70)
 
 
