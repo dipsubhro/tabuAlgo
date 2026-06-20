@@ -45,18 +45,18 @@ import yahoo_finance_experiment.config as cfg
 # ═══════════════════════════════════════════════════════════════════════════
 
 # General Setup
-NUM_RUNS = 30
+NUM_RUNS = 3
 SEED_POOL_SEED = 786683
 
 # [STS] Normal Tabu Search Parameters
-STS_ITER = 1500
+STS_ITER = 1000
 STS_NEIGHBORS = 50
 STS_TENURE = 10
 STS_STEP = 0.50
 
 # [RTS] Optimized Tabu Search Parameters
-RTS_ITER = 3000
-RTS_NEIGHBORS = 100
+RTS_ITER = 1000
+RTS_NEIGHBORS = 50
 RTS_TENURE = 10
 RTS_WEIGHT_CAP = 1.0
 RTS_OSC_CAP = 1.0
@@ -65,63 +65,54 @@ RTS_OSC_CAP = 1.0
 # DATA — 30 S&P 500 stocks for a challenging search space
 # ═══════════════════════════════════════════════════════════════════════════
 
-def download_stock_data():
+def load_stock_data():
     """
-    Downloads 10 years of real S&P 500 stock data from Yahoo Finance.
-    Uses 30 stocks across diverse sectors to create a high-dimensional
-    optimization problem where the enhancements truly matter.
+    Load daily returns for the configured stock universe.
+    Source: data/combined_prices.csv  — unified close prices.
     """
-    try:
-        import yfinance as yf
-    except ImportError:
-        print("  [!] yfinance not installed. Run: uv add yfinance")
-        sys.exit(1)
-
     import pandas as pd
 
-    tickers = [
-        # Technology (8)
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'ADBE', 'CRM',
-        # Finance (5)
-        'JPM', 'V', 'MA', 'BAC', 'GS',
-        # Healthcare (5)
-        'JNJ', 'UNH', 'PFE', 'ABT', 'MRK',
-        # Consumer (5)
-        'PG', 'KO', 'PEP', 'WMT', 'COST',
-        # Energy (3)
-        'XOM', 'CVX', 'COP',
-        # Industrials (2)
-        'HON', 'UNP',
-        # Utilities (2)
-        'NEE', 'DUK',
-    ]
+    combined_path = cfg.COMBINED_PRICES_CSV
 
-    print("  Downloading data from Yahoo Finance...")
-    print(f"  Tickers : {len(tickers)} stocks across 7 sectors")
-    print(f"  Period  : Jan 2013 – Jan 2023")
+    if os.path.exists(combined_path):
+        print(f"  Loading combined close prices: {combined_path}")
+        close = pd.read_csv(combined_path, index_col=0, parse_dates=True)
+        print(f"  ✓ Close prices : {close.shape[1]} tickers, {close.shape[0]} rows")
+        print(f"  ✓ Date range   : {close.index[0].date()} → {close.index[-1].date()}")
 
-    raw = yf.download(
-        tickers,
-        start='2013-01-01',
-        end='2023-01-01',
-        auto_adjust=True,
-        progress=False,
-    )
+        returns       = close.pct_change().dropna()
+        stock_names   = list(returns.columns)
+        returns_array = returns.values
 
-    if isinstance(raw.columns, pd.MultiIndex):
-        data = raw['Close']
+        print(f"  ✓ Daily returns: {returns.shape[0]} trading days")
     else:
-        data = raw
+        try:
+            import yfinance as yf
+        except ImportError:
+            print("  [!] yfinance not installed. Run: uv add yfinance")
+            sys.exit(1)
 
-    data = data.dropna(axis=1, thresh=int(0.9 * len(data)))
-    data = data.dropna()
+        print("  combined_prices.csv not found — downloading from Yahoo Finance...")
+        raw = yf.download(
+            cfg.TICKERS,
+            start=cfg.DATA_START,
+            end=cfg.DATA_END,
+            auto_adjust=True,
+            progress=False,
+        )
 
-    returns = data.pct_change().dropna()
-    stock_names = list(returns.columns)
-    returns_array = returns.values
+        close = raw['Close'] if isinstance(raw.columns, pd.MultiIndex) else raw
+        close = close.dropna(axis=1, thresh=int(cfg.DATA_COVERAGE_THRESHOLD * len(close)))
+        close = close.dropna()
 
-    print(f"  Downloaded : {len(stock_names)} stocks")
-    print(f"  Trading days: {len(returns_array)}")
+        os.makedirs(os.path.dirname(combined_path), exist_ok=True)
+        close.to_csv(combined_path)
+
+        returns       = close.pct_change().dropna()
+        stock_names   = list(returns.columns)
+        returns_array = returns.values
+
+        print(f"  ✓ Downloaded : {len(stock_names)} stocks, {len(returns_array)} trading days")
 
     return stock_names, returns_array
 
@@ -183,7 +174,7 @@ def main():
 
     # ── Step 1: Get Data ──────────────────────────────────────────
     print("\n  [1] Fetching real market data...")
-    stock_names, returns_data = download_stock_data()
+    stock_names, returns_data = load_stock_data()
     n_assets = len(stock_names)
 
     cov_daily = np.cov(returns_data.T)
