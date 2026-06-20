@@ -255,7 +255,7 @@ def main():
     opt_metrics = calc_all_metrics(opt_best['best_weights'], returns_data, cov_daily, RF)
 
     # ── Build output text ─────────────────────────────────────────────
-    output_path = cfg.OUT_COMPARISON_TXT
+    output_path = os.path.join(cfg.OUTPUTS_DIR, "rts_sts_comparison.txt")
     lines = []
 
     lines.append("=" * 80)
