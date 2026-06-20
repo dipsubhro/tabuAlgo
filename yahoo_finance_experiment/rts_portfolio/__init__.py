@@ -1,5 +1,5 @@
-from .single_rts_engine import SingleReactiveTabuSearch
-from .standard_tabu_engine import StandardTabuSearch
+from .rts import SingleReactiveTabuSearch
+from .sts import StandardTabuSearch
 
 __all__ = [
     'SingleReactiveTabuSearch',

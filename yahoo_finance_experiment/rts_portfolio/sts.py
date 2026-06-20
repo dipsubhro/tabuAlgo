@@ -26,6 +26,7 @@ from .fitness import (
 )
 
 class StandardTabuSearch:
+    # ── Initialization ──
     def __init__(self, returns_data, cov_matrix, n_assets, rf=0.02, max_iter=5000,
                  neighbors_size=50, tenure=10, step_scale=0.10, seed=None):
         self.returns_data, self.cov_matrix, self.n_assets, self.rf = returns_data, cov_matrix, n_assets, rf
@@ -39,14 +40,17 @@ class StandardTabuSearch:
     def _hash(weights, precision=3):
         return hash(tuple(np.round(weights, precision)))
 
+    # ── Neighbor Generation (Gaussian Only) ──
     def _generate_neighbors_2d(self, current):
         noise = np.random.normal(0, self.step_scale, (self.neighbors_size, self.n_assets))
         return repair_weights_2d(current + noise)
 
+    # ── Main Search Loop ──
     def run(self):
         if self.seed is not None:
             np.random.seed(self.seed)
 
+        # Initialize tracking and tabu list
         current = repair_weights(np.random.uniform(0, 1, self.n_assets))
         current_sharpe = self._sharpe(current)
         best_weights, best_sharpe = current.copy(), current_sharpe
@@ -57,6 +61,7 @@ class StandardTabuSearch:
         stagnation_threshold, max_diversifications = max(200, self.max_iter // 8), 5
 
         for iteration in range(self.max_iter):
+            # Generate and evaluate candidates
             candidates_2d = self._generate_neighbors_2d(current)
             cand_sharpes, cand_rets, cand_risks = sharpe_ratio_2d(
                 candidates_2d, self.returns_data, self.cov_matrix, self.rf
@@ -72,9 +77,11 @@ class StandardTabuSearch:
             np.random.shuffle(neighbors)
             neighbors.sort(key=lambda t: t[1], reverse=True)
 
+            # Strict Acceptance: take best non-tabu neighbor (No Aspiration)
             accepted = next((n for n in neighbors if n[2] not in tabu_list), neighbors[0])
             new_weights, new_sharpe, new_hash = accepted
 
+            # Update state and tabu list
             current, current_sharpe = new_weights, new_sharpe
             tabu_list.append(new_hash)
 
@@ -84,6 +91,7 @@ class StandardTabuSearch:
             else:
                 iters_without_improvement += 1
 
+            # Complete random restart on stagnation
             if iters_without_improvement >= stagnation_threshold and diversification_count < max_diversifications:
                 current = repair_weights(np.random.uniform(0, 1, self.n_assets))
                 current_sharpe = self._sharpe(current)

@@ -24,6 +24,7 @@ from .fitness import (
 )
 from .repository import best_by_sharpe, sample_repository_weights, update_repository
 
+# ── Module A: Lévy Flight Neighborhood Generator ──
 def levy_flight(size, beta=1.5):
     sigma_u = (_gamma(1 + beta) * math.sin(math.pi * beta / 2) / 
                (_gamma((1 + beta) / 2) * beta * 2 ** ((beta - 1) / 2))) ** (1 / beta)
@@ -32,6 +33,7 @@ def levy_flight(size, beta=1.5):
     return u / (np.abs(v) ** (1.0 / beta))
 
 class SingleReactiveTabuSearch:
+    # ── Initialization ──
     def __init__(self, returns_data, cov_matrix, n_assets, rf=0.02, max_iter=5000,
                  neighbors_size=50, initial_tenure=10, weight_cap=0.10,
                  oscillation_cap=0.15, beta=1.5, cycle_threshold=3,
@@ -50,6 +52,7 @@ class SingleReactiveTabuSearch:
     def _hash(weights, precision=3):
         return hash(tuple(np.round(weights, precision)))
 
+    # ── Neighbor Generation (Mixed Gaussian & Module A: Lévy) ──
     def _generate_neighbors_2d(self, current, step_scale, use_cap=False):
         n_levy = max(1, int(0.30 * self.neighbors_size))
         n_gauss = self.neighbors_size - n_levy
@@ -60,10 +63,12 @@ class SingleReactiveTabuSearch:
         candidates = np.vstack([cands_g, cands_l])
         return repair_weights_capped_2d(candidates, self.oscillation_cap) if use_cap else repair_weights_2d(candidates)
 
+    # ── Main Search Loop ──
     def run(self):
         if self.seed is not None:
             np.random.seed(self.seed)
 
+        # Initialize tracking, tabu list, and repository
         current = repair_weights(np.random.uniform(0, 1, self.n_assets))
         current_sharpe = self._sharpe(current)
         best_weights, best_sharpe = current.copy(), current_sharpe
@@ -83,9 +88,11 @@ class SingleReactiveTabuSearch:
         stagnation_threshold, max_diversifications = max(200, self.max_iter // 8), 12
 
         for iteration in range(self.max_iter):
+            # ── Module C: Strategic Oscillation (Toggle constraints) ──
             oscillation_active = ((iteration // self.osc_period) % 5 == 4)
             phase = "Oscillate" if oscillation_active else ("Diversify" if iters_without_improvement > stagnation_threshold // 2 else ("Intensify" if iters_without_improvement == 0 and iteration > 0 else "Feasible"))
 
+            # Generate and evaluate candidates
             candidates_2d = self._generate_neighbors_2d(current, step_scale, use_cap=oscillation_active)
             cand_sharpes, cand_rets, cand_risks = sharpe_ratio_2d(candidates_2d, self.returns_data, self.cov_matrix, self.rf)
 
@@ -100,13 +107,16 @@ class SingleReactiveTabuSearch:
             np.random.shuffle(neighbors)
             neighbors.sort(key=lambda t: t[1], reverse=True)
 
+            # ── Module D: Multi-Objective Aspiration (Override tabu if globally best) ──
             accepted = next((n[:3] for n in neighbors if n[1] > best_sharpe or n[2] not in tabu_list), neighbors[0][:3])
             new_weights, new_sharpe, new_hash = accepted
 
+            # Update state and tabu list
             current, current_sharpe = new_weights, new_sharpe
             tabu_list.append(new_hash)
             visit_count[new_hash] += 1
 
+            # ── Module B: Reactive Tabu Tenure ──
             if new_sharpe > best_sharpe:
                 best_weights, best_sharpe = new_weights.copy(), new_sharpe
                 iters_without_improvement = 0
@@ -121,6 +131,7 @@ class SingleReactiveTabuSearch:
                     tenure = min(self.max_tenure, tenure + 1)
                     tabu_list = deque(tabu_list, maxlen=tenure)
 
+            # Repository-guided restart on stagnation
             if iters_without_improvement >= stagnation_threshold and diversification_count < max_diversifications:
                 restart_anchor = sample_repository_weights(repository)
                 if restart_anchor is None: restart_anchor = best_weights
