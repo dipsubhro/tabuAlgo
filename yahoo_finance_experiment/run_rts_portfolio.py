@@ -26,14 +26,14 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from yahoo_finance_experiment.rts_portfolio import SingleReactiveTabuSearch, SwarmReactiveTabuSearch
-
-# ── ALGORITHM SELECTOR ──
-ALGORITHM = "SINGLE"  # Options: "SINGLE" or "SWARM"
-
 from yahoo_finance_experiment.rts_portfolio.fitness import (
     repair_weights, calc_annual_return, calc_annual_risk,
     calc_all_metrics,
 )
+import yahoo_finance_experiment.config as cfg
+
+# ── ALGORITHM SELECTOR (edit config.py to change) ──
+ALGORITHM = cfg.ALGORITHM
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -54,27 +54,16 @@ def download_stock_data():
 
     import pandas as pd
 
-    tickers = [
-        'AAPL',   # Apple         — Technology``
-        'MSFT',   # Microsoft     — Technology
-        'GOOGL',  # Alphabet      — Technology
-        'AMZN',   # Amazon        — Consumer
-        'JPM',    # JPMorgan      — Finance
-        'JNJ',    # Johnson&Johnson — Healthcare
-        'V',      # Visa          — Finance
-        'PG',     # Procter&Gamble — Consumer
-        'XOM',    # ExxonMobil    — Energy
-        'NVDA',   # NVIDIA        — Technology
-    ]
+    tickers = cfg.TICKERS
 
     print("  Downloading data from Yahoo Finance...")
     print(f"  Tickers : {tickers}")
-    print(f"  Period  : Jan 2013 – Jan 2023 (same as target paper)")
+    print(f"  Period  : {cfg.DATA_START} – {cfg.DATA_END} (same as target paper)")
 
     raw = yf.download(
         tickers,
-        start='2013-01-01',
-        end='2023-01-01',
+        start=cfg.DATA_START,
+        end=cfg.DATA_END,
         auto_adjust=True,
         progress=False,
     )
@@ -84,7 +73,7 @@ def download_stock_data():
     else:
         data = raw
 
-    data = data.dropna(axis=1, thresh=int(0.9 * len(data)))
+    data = data.dropna(axis=1, thresh=int(cfg.DATA_COVERAGE_THRESHOLD * len(data)))
     data = data.dropna()
 
     returns = data.pct_change().dropna()
@@ -169,13 +158,15 @@ def _build_pareto_front(points):
 def plot_pareto_front(all_explored, pareto_front, best_result,
                       rmpso_ref, cso_ref,
                       returns_data, cov_matrix, n_assets, rf,
-                      output_path='rts_pareto_front.png'):
+                      output_path=None):
     """
     Generate the required Pareto Front plot showing risk-return trade-off
     of RTS results compared to a random-walk baseline.
     """
     import matplotlib.pyplot as plt
     import matplotlib
+    if output_path is None:
+        output_path = cfg.OUT_PARETO_PNG
 
     matplotlib.rcParams['font.family'] = 'DejaVu Sans'
 
@@ -271,7 +262,7 @@ def plot_pareto_front(all_explored, pareto_front, best_result,
 # ═══════════════════════════════════════════════════════════════════════════
 
 def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
-                            output_path='rts_convergence_graphs.png'):
+                            output_path=None):
     """
     Multi-panel convergence figure with:
       Panel 1 — All-runs Sharpe convergence (overlaid), best run highlighted
@@ -282,6 +273,8 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
     import matplotlib.patches as mpatches
+    if output_path is None:
+        output_path = cfg.OUT_CONVERGENCE_GRAPH
 
     PALETTE = {
         'bg':        '#0f1117',
@@ -448,7 +441,7 @@ def main():
     print("  Dataset: S&P 500, Jan 2013 – Jan 2023")
     print("=" * 70)
 
-    RF = 0.02
+    RF = cfg.RF
 
     # ── Step 1: Get Data ──────────────────────────────────────────
     print("\n  [1] Fetching real market data...")
@@ -474,18 +467,18 @@ def main():
                    tablefmt="fancy_grid"))
 
     # ── Step 2: Run RTS ───────────────────────────────────────────
-    NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", "30"))
-    SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "786683"))
+    NUM_RUNS      = cfg.NUM_RUNS
+    SEED_POOL_SEED = cfg.SEED_POOL_SEED
     if ALGORITHM == "SWARM":
-        MAX_ITER = 2000
-        SWARM_SIZE = 10
+        MAX_ITER   = cfg.MAX_ITER_SWARM
+        SWARM_SIZE = cfg.SWARM_SIZE
     else:
-        MAX_ITER = 5000
+        MAX_ITER   = cfg.MAX_ITER_SINGLE
         SWARM_SIZE = 1
-    NEIGHBORS = 50
-    TENURE = 10
-    WEIGHT_CAP = 0.10
-    OSC_CAP = 0.15
+    NEIGHBORS  = cfg.NEIGHBORS
+    TENURE     = cfg.TENURE
+    WEIGHT_CAP = cfg.WEIGHT_CAP
+    OSC_CAP    = cfg.OSC_CAP
     print(f"\n  [2] Running {ALGORITHM} RTS ({NUM_RUNS} runs)...")
     if ALGORITHM == "SWARM":
         print(f"      Iterations={MAX_ITER}, Swarm Size={SWARM_SIZE}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
@@ -615,29 +608,21 @@ def main():
         tablefmt="grid",
     )
 
-    with open("rts_convergence.txt", "w") as f:
+    with open(cfg.OUT_CONVERGENCE_TXT, "w") as f:
         f.write("Reactive Tabu Search — Convergence Log\n")
         f.write(f"Best Run (Seed {SEEDS[best_idx]})\n")
         f.write("=" * 70 + "\n\n")
         f.write(conv_table)
         f.write("\n")
-    print("  [✓] Convergence table saved: rts_convergence.txt")
+    print(f"  [✓] Convergence table saved: {cfg.OUT_CONVERGENCE_TXT}")
 
     # ── Step 6: OUTPUT 2 — Comparative Verdict ────────────────────
     print("\n  [4] Building comparison table...")
 
-    # Published reference values
-    rmpso_ref = {'return': None, 'risk': None, 'sharpe': 1.159}
-    cso_ref = {'return': 0.168, 'risk': 0.187, 'sharpe': 0.950}
-
-    # Paper results (from the reference script)
-    paper_results = {
-        'BFO':       {'return': 0.142, 'risk': 0.198, 'sharpe': 0.617},
-        'FWA':       {'return': 0.131, 'risk': 0.201, 'sharpe': 0.552},
-        'CSO':       {'return': 0.168, 'risk': 0.187, 'sharpe': 0.950},
-        'Bat':       {'return': 0.124, 'risk': 0.215, 'sharpe': 0.484},
-        'mean-CVaR': {'return': 0.098, 'risk': 0.142, 'sharpe': 0.549},
-    }
+    # Published reference values (edit config.py to change)
+    rmpso_ref    = cfg.RMPSO_REF
+    cso_ref      = cfg.CSO_REF
+    paper_results = cfg.PAPER_RESULTS
 
     comparison_rows = []
 
@@ -735,7 +720,7 @@ def main():
         tablefmt="grid",
     )
 
-    with open("rts_comparison.txt", "w") as f:
+    with open(cfg.OUT_COMPARISON_TXT, "w") as f:
         f.write("Reactive Tabu Search — Comparative Verdict\n")
         f.write("Dataset: S&P 500 Top 10 Stocks | "
                 "Period: 2013–2023 | RF=2%\n")
@@ -752,7 +737,7 @@ def main():
         f.write("\n")
 
     print(comp_table)
-    print(f"\n  [✓] Comparison table saved: rts_comparison.txt")
+    print(f"\n  [✓] Comparison table saved: {cfg.OUT_COMPARISON_TXT}")
 
     # ── Step 7: OUTPUT 3 — Pareto Front Plot ──────────────────────
     print("\n  [5] Generating Pareto front plot...")
