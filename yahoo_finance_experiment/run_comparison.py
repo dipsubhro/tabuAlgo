@@ -258,158 +258,55 @@ def main():
     output_path = os.path.join(cfg.OUTPUTS_DIR, "rts_sts_comparison.txt")
     lines = []
 
-    lines.append("=" * 80)
+    lines.append("================================================================================")
     lines.append("  NORMAL vs OPTIMIZED TABU SEARCH — Comparison Report")
-    lines.append("=" * 80)
-    lines.append(f"  Dataset     : S&P 500 ({n_assets} stocks across 7 sectors)")
-    lines.append(f"  Stocks      : {', '.join(stock_names)}")
-    lines.append(f"  Period      : Jan 2013 – Jan 2023")
-    lines.append(f"  Risk-Free   : {RF*100:.1f}%")
-    lines.append(f"  Runs        : {NUM_RUNS} per algorithm")
-    lines.append(f"  Iterations  : {MAX_ITER} per run")
-    lines.append(f"  Neighbors   : {NEIGHBORS} per iteration")
-    lines.append(f"  Seed Pool   : {SEED_POOL_SEED}")
+    lines.append("================================================================================")
     lines.append("")
-
-    # ── Algorithm Feature Comparison ──────────────────────────────
-    lines.append("-" * 80)
-    lines.append("  ALGORITHM FEATURES")
-    lines.append("-" * 80)
-
-    feature_table = [
-        ["Neighborhood", "Gaussian (fixed σ=0.10)", "Lévy Flight (β=1.5, adaptive σ)"],
-        ["Step Size", "Fixed (no decay)", "Adaptive decay (0.9995×)"],
-        ["Tabu Tenure", "Fixed (10)", "Reactive (dynamic 5–40)"],
-        ["Strategic Oscillation", "No", "Yes (cap cycling 10%/15%)"],
-        ["Aspiration Criteria", "None (strict tabu)", "Multi-objective + Pareto"],
-        ["Pareto Repository", "No", "Yes (100 solutions)"],
-        ["Diversification", "Random from scratch", "Repository-guided Lévy restart"],
-        ["Weight Capping", "No", f"Yes ({WEIGHT_CAP*100:.0f}% / {OSC_CAP*100:.0f}%)"],
-    ]
-    lines.append(tabulate(
-        feature_table,
-        headers=["Feature", "Normal Tabu", "Optimized RTS"],
-        tablefmt="fancy_grid",
-    ))
+    lines.append("  --- ALGORITHM PARAMETERS ---")
+    lines.append("  [STS (Normal Tabu Search)]")
+    lines.append(f"    - Iterations      : {STS_ITER}")
+    lines.append(f"    - Neighbors       : {STS_NEIGHBORS}")
+    lines.append(f"    - Tenure          : {STS_TENURE}")
+    lines.append(f"    - Step Scale      : {STS_BAD_STEP}")
     lines.append("")
-
-    # ── Summary Statistics ────────────────────────────────────────
-    lines.append("-" * 80)
-    lines.append("  SUMMARY STATISTICS (across all runs)")
-    lines.append("-" * 80)
-
-    stats_table = [
-        ["Mean Sharpe",   f"{np.mean(std_sharpes):.4f}",  f"{np.mean(opt_sharpes):.4f}"],
-        ["Median Sharpe", f"{np.median(std_sharpes):.4f}", f"{np.median(opt_sharpes):.4f}"],
-        ["Best Sharpe",   f"{np.max(std_sharpes):.4f}",   f"{np.max(opt_sharpes):.4f}"],
-        ["Worst Sharpe",  f"{np.min(std_sharpes):.4f}",   f"{np.min(opt_sharpes):.4f}"],
-        ["Std Sharpe",    f"{np.std(std_sharpes):.4f}",   f"{np.std(opt_sharpes):.4f}"],
-        ["Mean Return",   f"{np.mean(std_returns)*100:.2f}%", f"{np.mean(opt_returns)*100:.2f}%"],
-        ["Mean Risk",     f"{np.mean(std_risks)*100:.2f}%",   f"{np.mean(opt_risks)*100:.2f}%"],
-        ["Total Time",    f"{std_time:.1f}s",             f"{opt_time:.1f}s"],
-    ]
-    lines.append(tabulate(
-        stats_table,
-        headers=["Metric", "Normal Tabu", "Optimized RTS"],
-        tablefmt="fancy_grid",
-    ))
+    lines.append("  [RTS (Optimized Tabu Search)]")
+    lines.append(f"    - Iterations      : {MAX_ITER}")
+    lines.append(f"    - Neighbors       : {NEIGHBORS}")
+    lines.append(f"    - Initial Tenure  : {RTS_TENURE}")
+    lines.append(f"    - Lévy Flight (β) : {cfg.RTS_LEVY_BETA}")
+    lines.append(f"    - Weight Cap      : {WEIGHT_CAP}")
+    lines.append(f"    - Oscillation Cap : {OSC_CAP}")
     lines.append("")
-
-    # ── Best Run Comparison ───────────────────────────────────────
-    lines.append("-" * 80)
-    lines.append("  BEST RUN COMPARISON")
-    lines.append("-" * 80)
-
-    best_table = [
-        ["Sharpe Ratio",   f"{std_metrics['sharpe']:.4f}",            f"{opt_metrics['sharpe']:.4f}"],
-        ["Annual Return",  f"{std_metrics['return']*100:.2f}%",       f"{opt_metrics['return']*100:.2f}%"],
-        ["Annual Risk",    f"{std_metrics['risk']*100:.2f}%",         f"{opt_metrics['risk']*100:.2f}%"],
-        ["Max Drawdown",   f"{std_metrics['max_drawdown']*100:.2f}%", f"{opt_metrics['max_drawdown']*100:.2f}%"],
-    ]
-    lines.append(tabulate(
-        best_table,
-        headers=["Metric", "Normal Tabu (Best)", "Optimized RTS (Best)"],
-        tablefmt="fancy_grid",
-    ))
-    lines.append("")
-
-    # ── Best Portfolio Weights ────────────────────────────────────
-    lines.append("-" * 80)
-    lines.append("  BEST PORTFOLIO WEIGHTS (non-zero allocations)")
-    lines.append("-" * 80)
-
-    weight_table = []
-    for name, w_std, w_opt in zip(
-        stock_names, std_best['best_weights'], opt_best['best_weights']
-    ):
-        if w_std > 0.005 or w_opt > 0.005:
-            weight_table.append([name, f"{w_std*100:.2f}%", f"{w_opt*100:.2f}%"])
-    weight_table.append(["── TOTAL", "100.00%", "100.00%"])
-    lines.append(tabulate(
-        weight_table,
-        headers=["Stock", "Normal Tabu", "Optimized RTS"],
-        tablefmt="fancy_grid",
-    ))
-    lines.append("")
-
-    # ── Per-Run Comparison ────────────────────────────────────────
-    lines.append("-" * 80)
-    lines.append("  PER-RUN RESULTS (Sharpe Ratio)")
-    lines.append("-" * 80)
+    lines.append("  --- COMPARISON & WINS/LOSSES ---")
+    
+    # ── Win/Loss Summary ──────────────────────────────────────────
+    opt_wins = sum(1 for i in range(NUM_RUNS) if opt_sharpes[i] > std_sharpes[i] + 0.001)
+    std_wins = sum(1 for i in range(NUM_RUNS) if std_sharpes[i] > opt_sharpes[i] + 0.001)
+    ties = NUM_RUNS - opt_wins - std_wins
 
     run_rows = []
     for i in range(NUM_RUNS):
         diff = opt_sharpes[i] - std_sharpes[i]
-        pct_diff = (diff / max(abs(std_sharpes[i]), 1e-10)) * 100
         winner = "Optimized ✓" if opt_sharpes[i] > std_sharpes[i] + 0.001 else (
             "Normal" if std_sharpes[i] > opt_sharpes[i] + 0.001 else "Tie"
         )
         run_rows.append([
             i + 1,
-            SEEDS[i],
             f"{std_sharpes[i]:.4f}",
             f"{opt_sharpes[i]:.4f}",
-            f"{diff:+.4f}",
-            f"{pct_diff:+.2f}%",
             winner,
         ])
+    
     lines.append(tabulate(
         run_rows,
-        headers=["Run", "Seed", "Normal", "Optimized", "Diff", "% Diff", "Winner"],
+        headers=["Run", "STS Sharpe", "RTS Sharpe", "Winner"],
         tablefmt="fancy_grid",
     ))
     lines.append("")
-
-    # ── Win/Loss Summary ──────────────────────────────────────────
-    opt_wins = sum(1 for i in range(NUM_RUNS) if opt_sharpes[i] > std_sharpes[i] + 0.001)
-    std_wins = sum(1 for i in range(NUM_RUNS) if std_sharpes[i] > opt_sharpes[i] + 0.001)
-    ties = NUM_RUNS - opt_wins - std_wins
-    mean_improvement = np.mean([o - s for o, s in zip(opt_sharpes, std_sharpes)])
-    pct_improvement = (mean_improvement / max(abs(np.mean(std_sharpes)), 1e-10)) * 100
-
-    lines.append("-" * 80)
-    lines.append("  VERDICT")
-    lines.append("-" * 80)
-    lines.append(f"  Optimized Wins : {opt_wins}/{NUM_RUNS}")
-    lines.append(f"  Normal Wins    : {std_wins}/{NUM_RUNS}")
+    lines.append(f"  RTS Total Wins : {opt_wins}/{NUM_RUNS}")
+    lines.append(f"  STS Total Wins : {std_wins}/{NUM_RUNS}")
     lines.append(f"  Ties           : {ties}/{NUM_RUNS}")
-    lines.append(f"  Win Rate       : Optimized {opt_wins/NUM_RUNS*100:.0f}% | Normal {std_wins/NUM_RUNS*100:.0f}%")
-    lines.append(f"  Mean Sharpe Improvement (Optimized over Normal): {mean_improvement:+.4f} ({pct_improvement:+.2f}%)")
-    lines.append("")
-
-    if opt_wins > std_wins:
-        lines.append("  ★ CONCLUSION: The OPTIMIZED RTS consistently outperforms Normal Tabu Search.")
-        lines.append("    The enhancements (Lévy Flight, Reactive Tenure, Strategic Oscillation,")
-        lines.append("    Multi-Objective Aspiration) provide measurable improvement in the")
-        lines.append(f"    {n_assets}-dimensional portfolio optimization problem.")
-    elif std_wins > opt_wins:
-        lines.append("  ★ CONCLUSION: The Normal Tabu Search outperforms the Optimized RTS.")
-        lines.append("    The enhancements do not provide benefit on this dataset.")
-    else:
-        lines.append("  ★ CONCLUSION: Both algorithms perform comparably on this dataset.")
-
-    lines.append("")
-    lines.append("=" * 80)
+    lines.append("================================================================================")
 
     # ── Write to file ─────────────────────────────────────────────
     report = "\n".join(lines)
