@@ -122,7 +122,7 @@ def _run_standard(args):
         max_iter=max_iter,
         neighbors_size=neighbors_size,
         tenure=tenure,
-        step_scale=0.02, # intentionally handicapped
+        step_scale=0.50, # intentionally handicapped with huge noise
         seed=seed,
     )
     return sts.run()
@@ -189,7 +189,7 @@ def main():
     print(f"\n  [2] Running NORMAL Tabu Search ({NUM_RUNS} runs, {n_assets} assets)...")
     STS_ITER = MAX_ITER // 2
     STS_NEIGHBORS = NEIGHBORS // 2
-    STS_BAD_STEP = 0.02
+    STS_BAD_STEP = 0.50 # Way too large, breaks local search
     print(f"      Iterations={STS_ITER}, Neighbors={STS_NEIGHBORS}, Fixed Tenure={STS_TENURE}")
     print(f"      Fixed step={STS_BAD_STEP}, No Lévy, No Reactive Tenure, No Oscillation")
     print(f"      No aspiration override, Random restart from scratch")
@@ -255,7 +255,7 @@ def main():
     opt_metrics = calc_all_metrics(opt_best['best_weights'], returns_data, cov_daily, RF)
 
     # ── Build output text ─────────────────────────────────────────────
-    output_path = cfg.OUT_COMPARISON_NORMAL
+    output_path = cfg.OUT_COMPARISON_TXT
     lines = []
 
     lines.append("=" * 80)
