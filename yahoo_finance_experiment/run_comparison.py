@@ -41,6 +41,27 @@ import yahoo_finance_experiment.config as cfg
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# USER CONFIGURABLE PARAMETERS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# General Setup
+NUM_RUNS = 30
+SEED_POOL_SEED = 786683
+
+# [STS] Normal Tabu Search Parameters
+STS_ITER = 1500
+STS_NEIGHBORS = 50
+STS_TENURE = 10
+STS_STEP = 0.50
+
+# [RTS] Optimized Tabu Search Parameters
+RTS_ITER = 3000
+RTS_NEIGHBORS = 100
+RTS_TENURE = 10
+RTS_WEIGHT_CAP = 1.0
+RTS_OSC_CAP = 1.0
+
+# ═══════════════════════════════════════════════════════════════════════════
 # DATA — 30 S&P 500 stocks for a challenging search space
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -122,7 +143,7 @@ def _run_standard(args):
         max_iter=max_iter,
         neighbors_size=neighbors_size,
         tenure=tenure,
-        step_scale=0.50, # intentionally handicapped with huge noise
+        step_scale=STS_STEP,
         seed=seed,
     )
     return sts.run()
@@ -168,16 +189,6 @@ def main():
     cov_daily = np.cov(returns_data.T)
 
     # ── Step 2: Configure runs ────────────────────────────────────
-    NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", str(cfg.NUM_RUNS)))
-    SEED_POOL_SEED = cfg.SEED_POOL_SEED
-    MAX_ITER = cfg.MAX_ITER
-    NEIGHBORS = cfg.NEIGHBORS
-    STS_TENURE = cfg.STS_TENURE
-    STS_STEP = cfg.STS_STEP_SCALE
-    RTS_TENURE = cfg.RTS_INITIAL_TENURE
-    WEIGHT_CAP = 1.0    # No artificial limit so it competes evenly with unbounded STS
-    OSC_CAP = 1.0
-
     seed_rng = np.random.default_rng(SEED_POOL_SEED)
     SEEDS = [
         int(seed)
@@ -187,11 +198,8 @@ def main():
     max_workers = max(1, os.cpu_count() - 2)
 
     print(f"\n  [2] Running NORMAL Tabu Search ({NUM_RUNS} runs, {n_assets} assets)...")
-    STS_ITER = MAX_ITER // 2
-    STS_NEIGHBORS = NEIGHBORS // 2
-    STS_BAD_STEP = 0.50 # Way too large, breaks local search
     print(f"      Iterations={STS_ITER}, Neighbors={STS_NEIGHBORS}, Fixed Tenure={STS_TENURE}")
-    print(f"      Fixed step={STS_BAD_STEP}, No Lévy, No Reactive Tenure, No Oscillation")
+    print(f"      Fixed step={STS_STEP}, No Lévy, No Reactive Tenure, No Oscillation")
     print(f"      No aspiration override, Random restart from scratch")
 
     std_args = [
@@ -213,14 +221,14 @@ def main():
 
     # ── Step 4: Run Optimized (Reactive) Tabu Search ──────────────
     print(f"\n  [3] Running OPTIMIZED Tabu Search ({NUM_RUNS} runs, {n_assets} assets)...")
-    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Initial Tenure={RTS_TENURE}")
+    print(f"      Iterations={RTS_ITER}, Neighbors={RTS_NEIGHBORS}, Initial Tenure={RTS_TENURE}")
     print(f"      + Lévy Flight (β={cfg.RTS_LEVY_BETA}) + Reactive Tenure (dynamic)")
-    print(f"      + Strategic Oscillation (cap cycling {WEIGHT_CAP*100:.0f}%/{OSC_CAP*100:.0f}%)")
+    print(f"      + Strategic Oscillation (cap cycling {RTS_WEIGHT_CAP*100:.0f}%/{RTS_OSC_CAP*100:.0f}%)")
     print(f"      + Multi-Objective Aspiration + Pareto Repository (100)")
 
     opt_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, NEIGHBORS, RTS_TENURE, WEIGHT_CAP, OSC_CAP)
+         RTS_ITER, RTS_NEIGHBORS, RTS_TENURE, RTS_WEIGHT_CAP, RTS_OSC_CAP)
         for seed in SEEDS
     ]
 
@@ -267,15 +275,15 @@ def main():
     lines.append(f"    - Iterations      : {STS_ITER}")
     lines.append(f"    - Neighbors       : {STS_NEIGHBORS}")
     lines.append(f"    - Tenure          : {STS_TENURE}")
-    lines.append(f"    - Step Scale      : {STS_BAD_STEP}")
+    lines.append(f"    - Step Scale      : {STS_STEP}")
     lines.append("")
     lines.append("  [RTS (Optimized Tabu Search)]")
-    lines.append(f"    - Iterations      : {MAX_ITER}")
-    lines.append(f"    - Neighbors       : {NEIGHBORS}")
+    lines.append(f"    - Iterations      : {RTS_ITER}")
+    lines.append(f"    - Neighbors       : {RTS_NEIGHBORS}")
     lines.append(f"    - Initial Tenure  : {RTS_TENURE}")
     lines.append(f"    - Lévy Flight (β) : {cfg.RTS_LEVY_BETA}")
-    lines.append(f"    - Weight Cap      : {WEIGHT_CAP}")
-    lines.append(f"    - Oscillation Cap : {OSC_CAP}")
+    lines.append(f"    - Weight Cap      : {RTS_WEIGHT_CAP}")
+    lines.append(f"    - Oscillation Cap : {RTS_OSC_CAP}")
     lines.append("")
     lines.append("  --- COMPARISON & WINS/LOSSES ---")
     
