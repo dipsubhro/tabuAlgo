@@ -63,11 +63,21 @@ MAX_ITER_SWARM  = 2000   # SwarmReactiveTabuSearch
 
 # --- Neighbourhood ---
 # Number of candidate neighbours generated each iteration
-NEIGHBORS = 100
+NEIGHBORS  = 100
+
+# --- Lévy Flight (Module A) ---
+# Lévy exponent β (1.5 = standard, lower = heavier tail / longer jumps)
+LEVY_BETA = 1.5
+# Fraction of neighbours generated via Lévy flight (rest = Gaussian)
+LEVY_MIX_RATIO = 0.30
 
 # --- Tabu Tenure ---
 # Initial length of the tabu list (dynamically adjusted by reactive module)
 TENURE = 10
+
+# --- Reactive Tenure / Diversification (Module B) ---
+# How many revisits to the same hash trigger a tenure increase
+CYCLE_THRESHOLD = 3
 
 # --- Swarm (only used when ALGORITHM = "SWARM") ---
 SWARM_SIZE = 10   # number of parallel solutions in the swarm
@@ -99,6 +109,11 @@ PAPER_RESULTS = {
 # ═══════════════════════════════════════════════════════════════════════════
 # OUTPUT PATHS
 # ═══════════════════════════════════════════════════════════════════════════
+
+# CSV dataset path (relative to yahoo_finance_experiment/)
+# Run generate_dataset.py once to create this file.
+# The runner loads from CSV if it exists; downloads & saves if not.
+DATASET_CSV = "dataset.csv"
 
 OUT_CONVERGENCE_TXT   = "rts_convergence.txt"
 OUT_COMPARISON_TXT    = "rts_comparison.txt"

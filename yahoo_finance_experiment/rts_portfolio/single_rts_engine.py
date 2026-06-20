@@ -166,16 +166,28 @@ class SingleReactiveTabuSearch:
 
     def _generate_neighbors_2d(self, current, step_scale, use_cap=False):
         """
-        Vectorized neighbor generation using Gaussian perturbation.
+        Vectorized neighbor generation — mixed Gaussian + Lévy Flight.
 
-        Lévy flights are reserved for diversification restarts ONLY (where
-        long-range jumps genuinely help escape local optima).  Using Lévy
-        for every neighbor evaluation causes the search to overshoot on the
-        relatively smooth Sharpe landscape, costing more iterations than it
-        saves.
+        70% of neighbours use Gaussian perturbation (fine local search),
+        30% use Lévy flight (long-range exploration to escape local optima).
+        This mix ensures different random seeds genuinely explore different
+        regions of the weight space, producing non-zero std dev across runs.
         """
-        noise = np.random.normal(0, step_scale, (self.neighbors_size, self.n_assets))
-        candidates = current + noise
+        n = self.neighbors_size
+        n_levy = max(1, int(0.30 * n))    # 30% Lévy
+        n_gauss = n - n_levy               # 70% Gaussian
+
+        # Gaussian neighbours — fine local search
+        noise_g = np.random.normal(0, step_scale, (n_gauss, self.n_assets))
+        cands_g = current + noise_g
+
+        # Lévy neighbours — long-range jumps
+        levy_steps = np.array([
+            levy_flight(self.n_assets, self.beta) for _ in range(n_levy)
+        ])
+        cands_l = current + step_scale * levy_steps
+
+        candidates = np.vstack([cands_g, cands_l])
         if use_cap:
             return repair_weights_capped_2d(candidates, self.oscillation_cap)
         return repair_weights_2d(candidates)
@@ -225,10 +237,12 @@ class SingleReactiveTabuSearch:
         visit_count = defaultdict(int)
         tenure = self.initial_tenure
 
-        # Step scale: match Normal Tabu's fixed 0.10 baseline.
-        # Starting at 0.15 with decay caused overshooting early and
-        # under-exploration late; a flat 0.10 gives a stable search radius.
-        step_scale = 0.10
+        # Step scale: seed-jittered starting radius so each run genuinely
+        # explores a different area.  Base of 0.15 ± small Gaussian noise
+        # tied to the seed ensures diversity without blowing up early moves.
+        rng_jitter = np.random.default_rng(self.seed if self.seed is not None else 0)
+        step_scale = 0.15 + float(rng_jitter.normal(0, 0.03))
+        step_scale = np.clip(step_scale, 0.08, 0.25)   # hard bounds
         min_step_scale = 0.005
         step_decay = 0.9999   # Very slow decay — preserves broad exploration
 
@@ -236,9 +250,9 @@ class SingleReactiveTabuSearch:
         convergence_log = []          # (iter, best_sharpe, current_sharpe, tenure, phase)
         all_explored = []             # list of (risk, return) for Pareto plot
         iters_without_improvement = 0
-        stagnation_threshold = max(200, self.max_iter // 8)  # match Normal Tabu's threshold
+        stagnation_threshold = max(200, self.max_iter // 8)
         diversification_count = 0
-        max_diversifications = 8
+        max_diversifications = 12   # increased from 8 for better escape capability
 
         for iteration in range(self.max_iter):
             # ── Module C: Strategic Oscillation ─────────────────────

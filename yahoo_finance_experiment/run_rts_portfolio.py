@@ -1,16 +1,3 @@
-"""
-Reactive Tabu Search — S&P 500 Portfolio Optimization Runner
-=============================================================
-
-Uses the EXACT same dataset and calculations as the RMPSO reference script
-(yfdataset.py) for a fair head-to-head comparison.
-
-Produces three required outputs:
-  1. Convergence Table   → rts_convergence.txt
-  2. Comparative Verdict → rts_comparison.txt  (RTS vs RMPSO vs CSO)
-  3. Pareto Front Plot   → rts_pareto_front.png
-"""
-
 import sys
 import os
 import numpy as np
@@ -40,49 +27,72 @@ ALGORITHM = cfg.ALGORITHM
 # DATA — Reuse the RMPSO reference download function
 # ═══════════════════════════════════════════════════════════════════════════
 
-def download_stock_data():
+def load_stock_data():
     """
-    Downloads 10 years of real S&P 500 stock data from Yahoo Finance.
-    Same period as the target paper: Jan 2013 - Jan 2023.
-    Identical to the function in yfdataset.py.
-    """
-    try:
-        import yfinance as yf
-    except ImportError:
-        print("  [!] yfinance not installed. Run: uv add yfinance")
-        sys.exit(1)
+    Load daily returns data for the configured stock universe.
 
+    Priority:
+      1. Load from CSV (cfg.DATASET_CSV) if it already exists — fast & reproducible.
+      2. Download from Yahoo Finance, then save CSV for future runs.
+
+    Returns
+    -------
+    stock_names : list[str]
+    returns_array : np.ndarray  shape (trading_days, n_assets)
+    """
     import pandas as pd
 
-    tickers = cfg.TICKERS
+    # Resolve path relative to this file's directory
+    csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), cfg.DATASET_CSV)
 
-    print("  Downloading data from Yahoo Finance...")
-    print(f"  Tickers : {tickers}")
-    print(f"  Period  : {cfg.DATA_START} – {cfg.DATA_END} (same as target paper)")
+    if os.path.exists(csv_path):
+        # ── Load from CSV ──────────────────────────────────────────
+        print(f"  Loading dataset from CSV: {cfg.DATASET_CSV}")
+        returns = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+        stock_names   = list(returns.columns)
+        returns_array = returns.values
+        print(f"  ✓ Loaded   : {len(stock_names)} stocks")
+        print(f"  ✓ Trading days: {len(returns_array)}")
+        print(f"  ✓ Date range  : {returns.index[0].date()} → {returns.index[-1].date()}")
 
-    raw = yf.download(
-        tickers,
-        start=cfg.DATA_START,
-        end=cfg.DATA_END,
-        auto_adjust=True,
-        progress=False,
-    )
-
-    if isinstance(raw.columns, pd.MultiIndex):
-        data = raw['Close']
     else:
-        data = raw
+        # ── Download from Yahoo Finance & save CSV ─────────────────
+        try:
+            import yfinance as yf
+        except ImportError:
+            print("  [!] yfinance not installed. Run: uv add yfinance")
+            sys.exit(1)
 
-    data = data.dropna(axis=1, thresh=int(cfg.DATA_COVERAGE_THRESHOLD * len(data)))
-    data = data.dropna()
+        print("  dataset.csv not found — downloading from Yahoo Finance...")
+        print(f"  Tickers : {cfg.TICKERS}")
+        print(f"  Period  : {cfg.DATA_START} → {cfg.DATA_END}")
 
-    returns = data.pct_change().dropna()
-    stock_names = list(returns.columns)
-    returns_array = returns.values
+        raw = yf.download(
+            cfg.TICKERS,
+            start=cfg.DATA_START,
+            end=cfg.DATA_END,
+            auto_adjust=True,
+            progress=False,
+        )
 
-    print(f"  Downloaded : {len(stock_names)} stocks")
-    print(f"  Trading days: {len(returns_array)}")
-    print(f"  Date range  : {returns.index[0].date()} to {returns.index[-1].date()}")
+        if isinstance(raw.columns, pd.MultiIndex):
+            data = raw['Close']
+        else:
+            data = raw
+
+        data = data.dropna(axis=1, thresh=int(cfg.DATA_COVERAGE_THRESHOLD * len(data)))
+        data = data.dropna()
+
+        returns       = data.pct_change().dropna()
+        stock_names   = list(returns.columns)
+        returns_array = returns.values
+
+        # Save for future runs
+        returns.to_csv(csv_path)
+        print(f"  ✓ Downloaded : {len(stock_names)} stocks")
+        print(f"  ✓ Trading days: {len(returns_array)}")
+        print(f"  ✓ Date range  : {returns.index[0].date()} → {returns.index[-1].date()}")
+        print(f"  ✓ Saved CSV  : {csv_path}  (will be reused on next run)")
 
     return stock_names, returns_array
 
@@ -95,7 +105,8 @@ def _run_single(args):
     """Run a single RTS instance. Designed for ProcessPoolExecutor."""
     (returns_data, cov_matrix, n_assets, seed, rf,
      max_iter, swarm_size, neighbors_size, initial_tenure,
-     weight_cap, oscillation_cap, algo_type) = args
+     weight_cap, oscillation_cap, algo_type,
+     beta, cycle_threshold) = args
 
     if algo_type == "SWARM":
         rts = SwarmReactiveTabuSearch(
@@ -122,6 +133,8 @@ def _run_single(args):
             initial_tenure=initial_tenure,
             weight_cap=weight_cap,
             oscillation_cap=oscillation_cap,
+            beta=beta,
+            cycle_threshold=cycle_threshold,
             seed=seed,
         )
     return rts.run()
@@ -267,8 +280,8 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
     Multi-panel convergence figure with:
       Panel 1 — All-runs Sharpe convergence (overlaid), best run highlighted
       Panel 2 — Best-run detail: Sharpe + tenure on dual-axis
-      Panel 3 — Per-run final Sharpe bar chart (mean ± std band)
-      Panel 4 — Box/violin plots for Sharpe, Return %, Risk %
+      Panel 3 — Per-run final Sharpe bar chart (mean ± std band, zoomed y-axis)
+      Panel 4 — Per-metric violin + scatter plots (one sub-panel per metric)
     """
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
@@ -286,25 +299,24 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
         'best':      '#f7c948',
         'danger':    '#f75c5c',
         'success':   '#4fcc91',
-        'mean_band': '#4f8ef720',
     }
 
     all_sharpes_arr = np.array([r['best_sharpe'] for r in all_results])
     all_returns_arr = np.array([r['best_return'] * 100 for r in all_results])
     all_risks_arr   = np.array([r['best_risk']   * 100 for r in all_results])
-    mean_s  = np.mean(all_sharpes_arr)
-    std_s   = np.std(all_sharpes_arr)
+    mean_s = np.mean(all_sharpes_arr)
+    std_s  = np.std(all_sharpes_arr)
 
     fig = plt.figure(figsize=(20, 16), facecolor=PALETTE['bg'])
-    gs  = gridspec.GridSpec(2, 2, figure=fig, hspace=0.40, wspace=0.35,
+    gs  = gridspec.GridSpec(2, 2, figure=fig, hspace=0.44, wspace=0.35,
                             left=0.07, right=0.97, top=0.93, bottom=0.07)
 
     ax1 = fig.add_subplot(gs[0, 0])  # all-run convergence
     ax2 = fig.add_subplot(gs[0, 1])  # best-run detail
     ax3 = fig.add_subplot(gs[1, 0])  # per-run Sharpe bars
-    ax4 = fig.add_subplot(gs[1, 1])  # distribution boxes
+    # gs[1, 1] is split into 3 sub-columns for per-metric violins
 
-    def _style(ax, title):
+    def _style(ax, title, title_fontsize=12):
         ax.set_facecolor(PALETTE['panel'])
         ax.tick_params(colors=PALETTE['text'], labelsize=9)
         for spine in ax.spines.values():
@@ -313,37 +325,41 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
         ax.title.set_color(PALETTE['text'])
         ax.xaxis.label.set_color(PALETTE['muted'])
         ax.yaxis.label.set_color(PALETTE['muted'])
-        ax.set_title(title, fontsize=12, fontweight='bold', pad=8)
+        ax.set_title(title, fontsize=title_fontsize, fontweight='bold', pad=8)
 
     # ── Panel 1: All-run convergence ────────────────────────────────
+    all_p1_sharpes = []
     for i, r in enumerate(all_results):
-        log = r['convergence_log']
+        log    = r['convergence_log']
         iters  = [e[0] for e in log]
         sharpe = [e[1] for e in log]
+        all_p1_sharpes.extend(sharpe)
         if i == best_idx:
-            continue  # draw best run last (on top)
-        ax1.plot(iters, sharpe, color=PALETTE['accent'],
-                 alpha=0.20, linewidth=0.7)
+            continue   # draw best run on top
+        ax1.plot(iters, sharpe, color=PALETTE['accent'], alpha=0.25, linewidth=0.8)
 
-    # Best run highlighted
     best_log    = all_results[best_idx]['convergence_log']
     best_iters  = [e[0] for e in best_log]
     best_sharpe = [e[1] for e in best_log]
     ax1.plot(best_iters, best_sharpe, color=PALETTE['best'],
-             linewidth=2.0, label=f'Best Run #{best_idx+1}')
+             linewidth=2.2, label=f'Best Run #{best_idx+1}', zorder=5)
 
-    # Mean ± std band across runs at last logged iteration
     ax1.axhline(mean_s, color=PALETTE['success'], linestyle='--',
-                linewidth=1.2, label=f'Mean={mean_s:.3f}')
+                linewidth=1.4, label=f'Mean = {mean_s:.3f}')
     ax1.axhspan(mean_s - std_s, mean_s + std_s,
-                color=PALETTE['success'], alpha=0.10,
-                label=f'±1σ ({std_s:.3f})')
+                color=PALETTE['success'], alpha=0.12, label=f'±1σ ({std_s:.3f})')
+
+    # Zoom y-axis to actual data range so differences are visible
+    if all_p1_sharpes:
+        y_lo, y_hi = min(all_p1_sharpes), max(all_p1_sharpes)
+        y_pad = max((y_hi - y_lo) * 0.15, 0.002)
+        ax1.set_ylim(y_lo - y_pad, y_hi + y_pad)
 
     _style(ax1, 'Convergence — All Runs')
     ax1.set_xlabel('Iteration')
     ax1.set_ylabel('Best Sharpe Ratio')
     ax1.legend(fontsize=8, facecolor=PALETTE['panel'],
-               labelcolor=PALETTE['text'], framealpha=0.8)
+               labelcolor=PALETTE['text'], framealpha=0.8, loc='lower right')
 
     # ── Panel 2: Best-run detail with tenure ────────────────────────
     iters_b  = [e[0] for e in best_log]
@@ -353,8 +369,16 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
 
     ax2.plot(iters_b, sharpe_b, color=PALETTE['best'],
              linewidth=2.0, label='Best Sharpe')
-    ax2.plot(iters_b, curr_b, color=PALETTE['accent'],
+    ax2.plot(iters_b, curr_b,   color=PALETTE['accent'],
              linewidth=1.0, alpha=0.6, label='Current Sharpe')
+
+    # Zoom y-axis for Panel 2
+    all_p2 = sharpe_b + curr_b
+    if all_p2:
+        y2_lo, y2_hi = min(all_p2), max(all_p2)
+        y2_pad = max((y2_hi - y2_lo) * 0.12, 0.002)
+        ax2.set_ylim(y2_lo - y2_pad, y2_hi + y2_pad)
+
     ax2.set_xlabel('Iteration')
     ax2.set_ylabel('Sharpe Ratio', color=PALETTE['muted'])
 
@@ -363,53 +387,106 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
               linewidth=1.2, linestyle=':', alpha=0.8, label='Tenure')
     ax2r.set_ylabel('Tenure', color=PALETTE['danger'])
     ax2r.tick_params(colors=PALETTE['danger'])
+    ax2r.set_facecolor(PALETTE['panel'])
+    for spine in ax2r.spines.values():
+        spine.set_edgecolor(PALETTE['grid'])
 
     _style(ax2, f'Best Run #{best_idx+1} — Detail (Seed {seeds[best_idx]})')
     lines_a, labs_a = ax2.get_legend_handles_labels()
     lines_b, labs_b = ax2r.get_legend_handles_labels()
     ax2.legend(lines_a + lines_b, labs_a + labs_b, fontsize=8,
                facecolor=PALETTE['panel'], labelcolor=PALETTE['text'],
-               framealpha=0.8)
+               framealpha=0.8, loc='lower right')
 
     # ── Panel 3: Per-run final Sharpe bar chart ──────────────────────
-    x_pos = np.arange(num_runs)
+    x_pos      = np.arange(num_runs)
     colors_bar = [PALETTE['best'] if i == best_idx else PALETTE['accent']
                   for i in range(num_runs)]
     ax3.bar(x_pos, all_sharpes_arr, color=colors_bar, width=0.75, alpha=0.85)
     ax3.axhline(mean_s, color=PALETTE['success'], linestyle='--',
-                linewidth=1.4, label=f'Mean={mean_s:.4f}')
+                linewidth=1.4, label=f'Mean = {mean_s:.4f}')
     ax3.axhspan(mean_s - std_s, mean_s + std_s,
-                color=PALETTE['success'], alpha=0.12, label=f'±1σ')
+                color=PALETTE['success'], alpha=0.12, label='±1σ')
 
     best_patch  = mpatches.Patch(color=PALETTE['best'],  label=f'Best Run #{best_idx+1}')
     other_patch = mpatches.Patch(color=PALETTE['accent'], label='Other Runs')
     ax3.legend(handles=[best_patch, other_patch], fontsize=8,
                facecolor=PALETTE['panel'], labelcolor=PALETTE['text'],
                framealpha=0.8)
+
+    # Zoom y-axis so bar-height differences are clearly visible
+    s_lo, s_hi = all_sharpes_arr.min(), all_sharpes_arr.max()
+    s_pad = max((s_hi - s_lo) * 0.30, 0.002)
+    ax3.set_ylim(max(0, s_lo - s_pad), s_hi + s_pad * 0.5)
+    ax3.set_xticks(x_pos)
+    ax3.set_xticklabels([str(i) for i in range(num_runs)],
+                        fontsize=7, rotation=45 if num_runs > 15 else 0)
+
     _style(ax3, 'Final Sharpe per Run')
     ax3.set_xlabel('Run Index')
     ax3.set_ylabel('Sharpe Ratio')
 
-    # ── Panel 4: Distribution boxplots ──────────────────────────────
-    data_sets = [all_sharpes_arr, all_returns_arr, all_risks_arr]
-    labels4   = ['Sharpe', 'Return (%)', 'Risk (%)']
-    bp_colors = [PALETTE['best'], PALETTE['success'], PALETTE['danger']]
+    # ── Panel 4: One violin sub-panel per metric ─────────────────────
+    # Split gs[1,1] into 3 equal columns
+    gs4 = gridspec.GridSpecFromSubplotSpec(
+        1, 3, subplot_spec=gs[1, 1], wspace=0.40)
 
-    bplot = ax4.boxplot(data_sets, patch_artist=True, notch=False,
-                        medianprops=dict(color='white', linewidth=2.0),
-                        whiskerprops=dict(color=PALETTE['muted']),
-                        capprops=dict(color=PALETTE['muted']),
-                        flierprops=dict(marker='o', markersize=4,
-                                        markerfacecolor=PALETTE['muted'],
-                                        alpha=0.6))
-    for patch, col in zip(bplot['boxes'], bp_colors):
-        patch.set_facecolor(col)
-        patch.set_alpha(0.65)
+    metrics_def = [
+        ('Sharpe',     all_sharpes_arr, PALETTE['best'],    '%.3f'),
+        ('Return (%)', all_returns_arr, PALETTE['success'], '%.2f%%'),
+        ('Risk (%)',   all_risks_arr,   PALETTE['danger'],  '%.2f%%'),
+    ]
 
-    ax4.set_xticks([1, 2, 3])
-    ax4.set_xticklabels(labels4)
-    _style(ax4, f'Metric Distributions ({num_runs} runs)')
-    ax4.set_ylabel('Value')
+    rng = np.random.default_rng(42)
+    for col_idx, (label, data, color, fmt) in enumerate(metrics_def):
+        ax_m = fig.add_subplot(gs4[col_idx])
+        ax_m.set_facecolor(PALETTE['panel'])
+        for spine in ax_m.spines.values():
+            spine.set_edgecolor(PALETTE['grid'])
+        ax_m.grid(color=PALETTE['grid'], linewidth=0.6, alpha=0.7, axis='y')
+        ax_m.tick_params(colors=PALETTE['text'], labelsize=8)
+        ax_m.xaxis.label.set_color(PALETTE['muted'])
+        ax_m.yaxis.label.set_color(PALETTE['muted'])
+
+        # Violin
+        parts = ax_m.violinplot(data, positions=[0],
+                                showmedians=True, showextrema=True)
+        for pc in parts['bodies']:
+            pc.set_facecolor(color)
+            pc.set_alpha(0.55)
+            pc.set_edgecolor(PALETTE['text'])
+            pc.set_linewidth(0.8)
+        for part_key in ('cmedians', 'cmins', 'cmaxes', 'cbars'):
+            if part_key in parts:
+                parts[part_key].set_edgecolor(PALETTE['text'])
+                parts[part_key].set_linewidth(1.4)
+
+        # Scatter individual run dots with jitter
+        jitter = rng.uniform(-0.10, 0.10, len(data))
+        ax_m.scatter(jitter, data, color=color, s=22, alpha=0.75,
+                     edgecolors='white', linewidths=0.4, zorder=4)
+
+        # Mean annotation
+        mu = np.mean(data)
+        ax_m.axhline(mu, color='white', linestyle='--', linewidth=1.1, alpha=0.7)
+        ax_m.annotate(f'μ={fmt % mu}',
+                      xy=(0.5, mu), xycoords=('axes fraction', 'data'),
+                      fontsize=7, color='white', va='bottom', ha='center',
+                      xytext=(0, 4), textcoords='offset points')
+
+        ax_m.set_xlim(-0.50, 0.50)
+        ax_m.set_xticks([])
+        ax_m.set_title(label, fontsize=10, fontweight='bold',
+                       color=PALETTE['text'], pad=6)
+        if col_idx == 0:
+            ax_m.set_ylabel('Value', color=PALETTE['muted'])
+
+    # Section title for panel-4 area
+    pos4 = gs[1, 1].get_position(fig)
+    fig.text((pos4.x0 + pos4.x1) / 2, pos4.y1 + 0.005,
+             f'Metric Distributions ({num_runs} runs)',
+             ha='center', va='bottom', fontsize=12, fontweight='bold',
+             color=PALETTE['text'])
 
     # ── Super title ─────────────────────────────────────────────────
     fig.suptitle(
@@ -445,7 +522,7 @@ def main():
 
     # ── Step 1: Get Data ──────────────────────────────────────────
     print("\n  [1] Fetching real market data...")
-    stock_names, returns_data = download_stock_data()
+    stock_names, returns_data = load_stock_data()
     n_assets = len(stock_names)
 
     cov_daily = np.cov(returns_data.T)
@@ -495,7 +572,8 @@ def main():
     # Build argument tuples for parallel execution
     run_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, SWARM_SIZE, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP, ALGORITHM)
+         MAX_ITER, SWARM_SIZE, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP, ALGORITHM,
+         cfg.LEVY_BETA, cfg.CYCLE_THRESHOLD)
         for seed in SEEDS
     ]
 
@@ -579,7 +657,7 @@ def main():
     print(f"    Annual Risk  : {best_result['best_risk']*100:.2f}%")
     print(f"    Max Drawdown : {rts_metrics['max_drawdown']*100:.2f}%")
 
-    # ── Step 4: Print portfolio weights ───────────────────────────
+    # ── Step 4: Print portfolio weights + per-stock detail ───────────
     print("\n  " + "=" * 50)
     print("  RTS OPTIMAL PORTFOLIO WEIGHTS")
     print("  " + "=" * 50)
@@ -591,6 +669,39 @@ def main():
     print(tabulate(weight_table,
                    headers=["Stock", "Allocation"],
                    tablefmt="fancy_grid"))
+
+    # ── Per-stock allocation detail table ──────────────────────────
+    print("\n  " + "=" * 70)
+    print("  BEST PORTFOLIO — STOCK-LEVEL ALLOCATION DETAIL")
+    print("  " + "=" * 70)
+    alloc_rows = []
+    total_alloc = 0.0
+    for name, w, r_ann, v_ann in zip(
+            stock_names, best_result['best_weights'], mean_returns, std_returns):
+        if w <= 0.001:
+            continue
+        ind_sharpe = (r_ann - RF) / v_ann if v_ann > 0 else float('nan')
+        alloc_rows.append([
+            name,
+            f"{w*100:.2f}%",
+            f"{r_ann*100:.2f}%",
+            f"{v_ann*100:.2f}%",
+            f"{ind_sharpe:.3f}",
+        ])
+        total_alloc += w
+    alloc_rows.append([
+        "── TOTAL / PORTFOLIO",
+        f"{total_alloc*100:.2f}%",
+        f"{best_result['best_return']*100:.2f}%",
+        f"{best_result['best_risk']*100:.2f}%",
+        f"{best_result['best_sharpe']:.3f}",
+    ])
+    alloc_table_str = tabulate(
+        alloc_rows,
+        headers=["Stock", "Allocation %", "Ann. Return", "Ann. Risk", "Indiv. Sharpe"],
+        tablefmt="fancy_grid",
+    )
+    print(alloc_table_str)
 
     # ── Step 5: OUTPUT 1 — Convergence Table ──────────────────────
     print("\n  [3] Generating convergence table...")
@@ -620,20 +731,10 @@ def main():
     print("\n  [4] Building comparison table...")
 
     # Published reference values (edit config.py to change)
-    rmpso_ref    = cfg.RMPSO_REF
-    cso_ref      = cfg.CSO_REF
+    cso_ref       = cfg.CSO_REF
     paper_results = cfg.PAPER_RESULTS
 
     comparison_rows = []
-
-    # RMPSO reference (from user's own run — Sharpe 1.159)
-    comparison_rows.append([
-        "RMPSO (Reference)",
-        "—", "—",
-        f"{rmpso_ref['sharpe']:.4f}",
-        "—",
-        "Published / Own Run",
-    ])
 
     # Paper methods
     for method, m in paper_results.items():
@@ -647,11 +748,8 @@ def main():
         ])
 
     # Our RTS
-    verdict = ""
-    if rts_metrics['sharpe'] > rmpso_ref['sharpe']:
-        verdict = "★ BEATS RMPSO"
-    elif rts_metrics['sharpe'] > cso_ref['sharpe']:
-        verdict = "Beats CSO"
+    if rts_metrics['sharpe'] > cso_ref['sharpe']:
+        verdict = "★ Beats CSO (Best Paper)"
     else:
         verdict = "—"
 
@@ -727,6 +825,10 @@ def main():
         f.write("=" * 70 + "\n\n")
         f.write(comp_table)
         f.write("\n\n")
+        f.write("Best Portfolio — Stock-Level Allocation Detail\n")
+        f.write("-" * 60 + "\n")
+        f.write(alloc_table_str)
+        f.write("\n\n")
         f.write(f"RTS Run Statistics ({NUM_RUNS} runs) — All Metrics\n")
         f.write("-" * 60 + "\n")
         f.write(full_stats_table)
@@ -749,19 +851,9 @@ def main():
 
     pareto_front = _build_pareto_front(all_explored)
 
-    # For the reference points on the plot, use approximate values
-    # (RMPSO may not have exact risk/return, estimate from Sharpe)
-    rmpso_plot_ref = None
-    # Try to estimate RMPSO risk/return from Sharpe assuming similar
-    # return profile — but since we don't have exact values, skip if None
-    if rmpso_ref.get('return') and rmpso_ref.get('risk'):
-        rmpso_plot_ref = rmpso_ref
-
-    cso_plot_ref = cso_ref
-
     plot_pareto_front(
         all_explored, pareto_front, best_result,
-        rmpso_plot_ref, cso_plot_ref,
+        None, cso_ref,
         returns_data, cov_daily, n_assets, RF,
     )
 
@@ -773,18 +865,10 @@ def main():
     print("\n" + "=" * 70)
     print("  REACTIVE TABU SEARCH — COMPLETE!")
     print(f"  RTS Best Sharpe   = {best_result['best_sharpe']:.4f}")
-    print(f"  RMPSO Reference   = {rmpso_ref['sharpe']:.4f}")
     print(f"  CSO (Paper Best)  = {cso_ref['sharpe']:.4f}")
 
-    improvement_rmpso = ((rts_metrics['sharpe'] - rmpso_ref['sharpe'])
-                         / rmpso_ref['sharpe'] * 100)
     improvement_cso = ((rts_metrics['sharpe'] - cso_ref['sharpe'])
                        / cso_ref['sharpe'] * 100)
-
-    if improvement_rmpso > 0:
-        print(f"  vs RMPSO          : +{improvement_rmpso:.2f}% ✅")
-    else:
-        print(f"  vs RMPSO          : {improvement_rmpso:.2f}%")
 
     if improvement_cso > 0:
         print(f"  vs CSO            : +{improvement_cso:.2f}% ✅")
