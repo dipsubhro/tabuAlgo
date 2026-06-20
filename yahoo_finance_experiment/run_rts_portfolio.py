@@ -237,6 +237,12 @@ def plot_pareto_front(all_explored, pareto_front, best_result,
     )
 
     # ── Style ──────────────────────────────────────────────────────
+    ax.grid(True, linestyle='--', alpha=0.4)
+    ax.set_facecolor('#ffffff')
+    fig.patch.set_facecolor('#ffffff')
+    for spine in ax.spines.values():
+        spine.set_edgecolor('black')
+
     ax.set_xlabel('Annual Risk / Volatility (%)', fontsize=13, fontweight='bold')
     ax.set_ylabel('Expected Annual Return (%)', fontsize=13, fontweight='bold')
     ax.set_title(
@@ -273,15 +279,15 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
         output_path = cfg.OUT_CONVERGENCE_GRAPH
 
     PALETTE = {
-        'bg':        '#0f1117',
-        'panel':     '#1a1d27',
-        'grid':      '#2a2d3a',
-        'text':      '#e0e0e0',
-        'muted':     '#6c7082',
-        'accent':    '#4f8ef7',
-        'best':      '#f7c948',
-        'danger':    '#f75c5c',
-        'success':   '#4fcc91',
+        'bg':        '#ffffff',
+        'panel':     '#ffffff',
+        'grid':      '#cccccc',
+        'text':      '#000000',
+        'muted':     '#333333',
+        'accent':    '#4a90e2', # blue
+        'best':      '#f39c12', # orange/gold
+        'danger':    '#e74c3c', # red
+        'success':   '#2ecc71', # green
     }
 
     all_sharpes_arr = np.array([r['best_sharpe'] for r in all_results])
@@ -303,12 +309,12 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
         ax.set_facecolor(PALETTE['panel'])
         ax.tick_params(colors=PALETTE['text'], labelsize=9)
         for spine in ax.spines.values():
-            spine.set_edgecolor(PALETTE['grid'])
-        ax.grid(color=PALETTE['grid'], linewidth=0.6, alpha=0.7)
+            spine.set_edgecolor('black')
+        ax.grid(color=PALETTE['grid'], linestyle='--', linewidth=0.6, alpha=0.5, axis='y')
         ax.title.set_color(PALETTE['text'])
         ax.xaxis.label.set_color(PALETTE['muted'])
         ax.yaxis.label.set_color(PALETTE['muted'])
-        ax.set_title(title, fontsize=title_fontsize, fontweight='bold', pad=8)
+        ax.set_title(title, fontsize=title_fontsize + 2, fontweight='bold', pad=8)
 
     # ── Panel 1: All-run convergence ────────────────────────────────
     all_p1_sharpes = []
@@ -385,7 +391,7 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
     x_pos      = np.arange(num_runs)
     colors_bar = [PALETTE['best'] if i == best_idx else PALETTE['accent']
                   for i in range(num_runs)]
-    ax3.bar(x_pos, all_sharpes_arr, color=colors_bar, width=0.75, alpha=0.85)
+    ax3.bar(x_pos, all_sharpes_arr, color=colors_bar, edgecolor='black', width=0.75, alpha=0.85)
     ax3.axhline(mean_s, color=PALETTE['success'], linestyle='--',
                 linewidth=1.4, label=f'Mean = {mean_s:.4f}')
     ax3.axhspan(mean_s - std_s, mean_s + std_s,
@@ -425,8 +431,8 @@ def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
         ax_m = fig.add_subplot(gs4[col_idx])
         ax_m.set_facecolor(PALETTE['panel'])
         for spine in ax_m.spines.values():
-            spine.set_edgecolor(PALETTE['grid'])
-        ax_m.grid(color=PALETTE['grid'], linewidth=0.6, alpha=0.7, axis='y')
+            spine.set_edgecolor('black')
+        ax_m.grid(color=PALETTE['grid'], linestyle='--', linewidth=0.6, alpha=0.5, axis='y')
         ax_m.tick_params(colors=PALETTE['text'], labelsize=8)
         ax_m.xaxis.label.set_color(PALETTE['muted'])
         ax_m.yaxis.label.set_color(PALETTE['muted'])
