@@ -166,10 +166,16 @@ class SingleReactiveTabuSearch:
 
     def _generate_neighbors_2d(self, current, step_scale, use_cap=False):
         """
-        Vectorized version to generate all neighbors at once.
+        Vectorized neighbor generation using Gaussian perturbation.
+
+        Lévy flights are reserved for diversification restarts ONLY (where
+        long-range jumps genuinely help escape local optima).  Using Lévy
+        for every neighbor evaluation causes the search to overshoot on the
+        relatively smooth Sharpe landscape, costing more iterations than it
+        saves.
         """
-        steps = levy_flight((self.neighbors_size, self.n_assets), self.beta)
-        candidates = current + step_scale * steps
+        noise = np.random.normal(0, step_scale, (self.neighbors_size, self.n_assets))
+        candidates = current + noise
         if use_cap:
             return repair_weights_capped_2d(candidates, self.oscillation_cap)
         return repair_weights_2d(candidates)
@@ -210,23 +216,27 @@ class SingleReactiveTabuSearch:
             max_size=self.repository_size,
         )
 
-        # Tabu list: deque of hashes
-        tabu_list = deque(maxlen=self.max_tenure * 3)
+        # Tabu list: capacity == tenure, exactly like Normal Tabu.
+        # The *3 multiplier caused the list to be 3-12× larger than Normal's
+        # regardless of the reactive tenure value, throttling exploration.
+        tabu_list = deque(maxlen=self.initial_tenure)
 
         # Module B: visit frequency for cycle detection
         visit_count = defaultdict(int)
         tenure = self.initial_tenure
 
-        # Step scale: starts large, decays (but Lévy still allows long jumps)
-        step_scale = 0.15
+        # Step scale: match Normal Tabu's fixed 0.10 baseline.
+        # Starting at 0.15 with decay caused overshooting early and
+        # under-exploration late; a flat 0.10 gives a stable search radius.
+        step_scale = 0.10
         min_step_scale = 0.005
-        step_decay = 0.9995
+        step_decay = 0.9999   # Very slow decay — preserves broad exploration
 
         # Tracking
         convergence_log = []          # (iter, best_sharpe, current_sharpe, tenure, phase)
         all_explored = []             # list of (risk, return) for Pareto plot
         iters_without_improvement = 0
-        stagnation_threshold = max(100, self.max_iter // 10)
+        stagnation_threshold = max(200, self.max_iter // 8)  # match Normal Tabu's threshold
         diversification_count = 0
         max_diversifications = 8
 
@@ -237,8 +247,12 @@ class SingleReactiveTabuSearch:
             # cap before normalisation — this biases the search toward
             # more diversified portfolios and explores the constraint
             # boundary from both sides.
-            cycle_pos = (iteration // self.osc_period) % 2
-            oscillation_active = (cycle_pos == 1)
+            # Oscillation is active 1-in-5 phases (20 % of iterations).
+            # The original 50 % split wasted half the budget in a capped
+            # sub-space that penalises the high-conviction weights that
+            # drive Sharpe on this dataset.
+            cycle_pos = (iteration // self.osc_period) % 5
+            oscillation_active = (cycle_pos == 4)
             if oscillation_active:
                 phase = "Oscillate"
             else:
@@ -285,8 +299,12 @@ class SingleReactiveTabuSearch:
             # ── Module D: Multi-Objective Aspiration Criteria ──────
             accepted = None
             for cand_w, cand_s, cand_h, repo_added in neighbors:
-                # Aspiration: override tabu if it improves Sharpe or the Pareto repository.
-                if cand_s > best_sharpe or repo_added:
+                # Aspiration: override tabu ONLY if the move improves the
+                # global best Sharpe.  Accepting moves solely because they
+                # enter the Pareto repository (repo_added) drifts the
+                # current solution into low-Sharpe / low-risk territory,
+                # wasting moves on diversity that doesn't improve the objective.
+                if cand_s > best_sharpe:
                     accepted = (cand_w, cand_s, cand_h)
                     break
                 # Normal: accept if not tabu
@@ -318,7 +336,7 @@ class SingleReactiveTabuSearch:
 
                 # Intensify: decrease tenure for fine-tuning
                 tenure = max(self.min_tenure, tenure - 1)
-                tabu_list = deque(tabu_list, maxlen=tenure * 3)
+                tabu_list = deque(tabu_list, maxlen=tenure)
 
             else:
                 iters_without_improvement += 1
@@ -327,27 +345,27 @@ class SingleReactiveTabuSearch:
                 if visit_count[new_hash] >= self.cycle_threshold:
                     # Diversify: exponential tenure increase
                     tenure = min(self.max_tenure, int(tenure * 1.5))
-                    tabu_list = deque(tabu_list, maxlen=tenure * 3)
+                    tabu_list = deque(tabu_list, maxlen=tenure)
 
                 elif iters_without_improvement > stagnation_threshold // 2:
                     # Gradual tenure increase
                     tenure = min(self.max_tenure, tenure + 1)
-                    tabu_list = deque(tabu_list, maxlen=tenure * 3)
+                    tabu_list = deque(tabu_list, maxlen=tenure)
 
             # ── Diversification restart if stuck ───────────────────
             if iters_without_improvement >= stagnation_threshold:
                 if diversification_count < max_diversifications:
-                    # Restart near a repository trade-off with a large Lévy perturbation.
+                    # Restart near the best-known region with a moderate
+                    # Gaussian jump (not Lévy ×5 which gave random points).
                     restart_anchor = sample_repository_weights(repository)
                     if restart_anchor is None:
                         restart_anchor = best_weights
-                    current = self._generate_neighbor(
-                        restart_anchor, step_scale * 5.0, use_cap=False
-                    )
+                    # σ=0.10 — diverse enough to escape, close enough to stay near good region
+                    noise = np.random.normal(0, 0.10, self.n_assets)
+                    current = repair_weights(restart_anchor + noise)
                     current_sharpe = self._sharpe(current)
 
-                    # Reset step scale
-                    step_scale = max(0.08, step_scale * 2.0)
+                    step_scale = 0.10  # stable post-restart scale
 
                     # Partially clear tabu list
                     for _ in range(len(tabu_list) // 2):

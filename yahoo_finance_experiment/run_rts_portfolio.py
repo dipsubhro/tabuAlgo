@@ -267,6 +267,172 @@ def plot_pareto_front(all_explored, pareto_front, best_result,
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# CONVERGENCE GRAPHS
+# ═══════════════════════════════════════════════════════════════════════════
+
+def plot_convergence_graphs(all_results, best_idx, seeds, num_runs,
+                            output_path='rts_convergence_graphs.png'):
+    """
+    Multi-panel convergence figure with:
+      Panel 1 — All-runs Sharpe convergence (overlaid), best run highlighted
+      Panel 2 — Best-run detail: Sharpe + tenure on dual-axis
+      Panel 3 — Per-run final Sharpe bar chart (mean ± std band)
+      Panel 4 — Box/violin plots for Sharpe, Return %, Risk %
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    import matplotlib.patches as mpatches
+
+    PALETTE = {
+        'bg':        '#0f1117',
+        'panel':     '#1a1d27',
+        'grid':      '#2a2d3a',
+        'text':      '#e0e0e0',
+        'muted':     '#6c7082',
+        'accent':    '#4f8ef7',
+        'best':      '#f7c948',
+        'danger':    '#f75c5c',
+        'success':   '#4fcc91',
+        'mean_band': '#4f8ef720',
+    }
+
+    all_sharpes_arr = np.array([r['best_sharpe'] for r in all_results])
+    all_returns_arr = np.array([r['best_return'] * 100 for r in all_results])
+    all_risks_arr   = np.array([r['best_risk']   * 100 for r in all_results])
+    mean_s  = np.mean(all_sharpes_arr)
+    std_s   = np.std(all_sharpes_arr)
+
+    fig = plt.figure(figsize=(20, 16), facecolor=PALETTE['bg'])
+    gs  = gridspec.GridSpec(2, 2, figure=fig, hspace=0.40, wspace=0.35,
+                            left=0.07, right=0.97, top=0.93, bottom=0.07)
+
+    ax1 = fig.add_subplot(gs[0, 0])  # all-run convergence
+    ax2 = fig.add_subplot(gs[0, 1])  # best-run detail
+    ax3 = fig.add_subplot(gs[1, 0])  # per-run Sharpe bars
+    ax4 = fig.add_subplot(gs[1, 1])  # distribution boxes
+
+    def _style(ax, title):
+        ax.set_facecolor(PALETTE['panel'])
+        ax.tick_params(colors=PALETTE['text'], labelsize=9)
+        for spine in ax.spines.values():
+            spine.set_edgecolor(PALETTE['grid'])
+        ax.grid(color=PALETTE['grid'], linewidth=0.6, alpha=0.7)
+        ax.title.set_color(PALETTE['text'])
+        ax.xaxis.label.set_color(PALETTE['muted'])
+        ax.yaxis.label.set_color(PALETTE['muted'])
+        ax.set_title(title, fontsize=12, fontweight='bold', pad=8)
+
+    # ── Panel 1: All-run convergence ────────────────────────────────
+    for i, r in enumerate(all_results):
+        log = r['convergence_log']
+        iters  = [e[0] for e in log]
+        sharpe = [e[1] for e in log]
+        if i == best_idx:
+            continue  # draw best run last (on top)
+        ax1.plot(iters, sharpe, color=PALETTE['accent'],
+                 alpha=0.20, linewidth=0.7)
+
+    # Best run highlighted
+    best_log    = all_results[best_idx]['convergence_log']
+    best_iters  = [e[0] for e in best_log]
+    best_sharpe = [e[1] for e in best_log]
+    ax1.plot(best_iters, best_sharpe, color=PALETTE['best'],
+             linewidth=2.0, label=f'Best Run #{best_idx+1}')
+
+    # Mean ± std band across runs at last logged iteration
+    ax1.axhline(mean_s, color=PALETTE['success'], linestyle='--',
+                linewidth=1.2, label=f'Mean={mean_s:.3f}')
+    ax1.axhspan(mean_s - std_s, mean_s + std_s,
+                color=PALETTE['success'], alpha=0.10,
+                label=f'±1σ ({std_s:.3f})')
+
+    _style(ax1, 'Convergence — All Runs')
+    ax1.set_xlabel('Iteration')
+    ax1.set_ylabel('Best Sharpe Ratio')
+    ax1.legend(fontsize=8, facecolor=PALETTE['panel'],
+               labelcolor=PALETTE['text'], framealpha=0.8)
+
+    # ── Panel 2: Best-run detail with tenure ────────────────────────
+    iters_b  = [e[0] for e in best_log]
+    sharpe_b = [e[1] for e in best_log]
+    curr_b   = [e[2] for e in best_log]
+    tenure_b = [e[3] for e in best_log]
+
+    ax2.plot(iters_b, sharpe_b, color=PALETTE['best'],
+             linewidth=2.0, label='Best Sharpe')
+    ax2.plot(iters_b, curr_b, color=PALETTE['accent'],
+             linewidth=1.0, alpha=0.6, label='Current Sharpe')
+    ax2.set_xlabel('Iteration')
+    ax2.set_ylabel('Sharpe Ratio', color=PALETTE['muted'])
+
+    ax2r = ax2.twinx()
+    ax2r.plot(iters_b, tenure_b, color=PALETTE['danger'],
+              linewidth=1.2, linestyle=':', alpha=0.8, label='Tenure')
+    ax2r.set_ylabel('Tenure', color=PALETTE['danger'])
+    ax2r.tick_params(colors=PALETTE['danger'])
+
+    _style(ax2, f'Best Run #{best_idx+1} — Detail (Seed {seeds[best_idx]})')
+    lines_a, labs_a = ax2.get_legend_handles_labels()
+    lines_b, labs_b = ax2r.get_legend_handles_labels()
+    ax2.legend(lines_a + lines_b, labs_a + labs_b, fontsize=8,
+               facecolor=PALETTE['panel'], labelcolor=PALETTE['text'],
+               framealpha=0.8)
+
+    # ── Panel 3: Per-run final Sharpe bar chart ──────────────────────
+    x_pos = np.arange(num_runs)
+    colors_bar = [PALETTE['best'] if i == best_idx else PALETTE['accent']
+                  for i in range(num_runs)]
+    ax3.bar(x_pos, all_sharpes_arr, color=colors_bar, width=0.75, alpha=0.85)
+    ax3.axhline(mean_s, color=PALETTE['success'], linestyle='--',
+                linewidth=1.4, label=f'Mean={mean_s:.4f}')
+    ax3.axhspan(mean_s - std_s, mean_s + std_s,
+                color=PALETTE['success'], alpha=0.12, label=f'±1σ')
+
+    best_patch  = mpatches.Patch(color=PALETTE['best'],  label=f'Best Run #{best_idx+1}')
+    other_patch = mpatches.Patch(color=PALETTE['accent'], label='Other Runs')
+    ax3.legend(handles=[best_patch, other_patch], fontsize=8,
+               facecolor=PALETTE['panel'], labelcolor=PALETTE['text'],
+               framealpha=0.8)
+    _style(ax3, 'Final Sharpe per Run')
+    ax3.set_xlabel('Run Index')
+    ax3.set_ylabel('Sharpe Ratio')
+
+    # ── Panel 4: Distribution boxplots ──────────────────────────────
+    data_sets = [all_sharpes_arr, all_returns_arr, all_risks_arr]
+    labels4   = ['Sharpe', 'Return (%)', 'Risk (%)']
+    bp_colors = [PALETTE['best'], PALETTE['success'], PALETTE['danger']]
+
+    bplot = ax4.boxplot(data_sets, patch_artist=True, notch=False,
+                        medianprops=dict(color='white', linewidth=2.0),
+                        whiskerprops=dict(color=PALETTE['muted']),
+                        capprops=dict(color=PALETTE['muted']),
+                        flierprops=dict(marker='o', markersize=4,
+                                        markerfacecolor=PALETTE['muted'],
+                                        alpha=0.6))
+    for patch, col in zip(bplot['boxes'], bp_colors):
+        patch.set_facecolor(col)
+        patch.set_alpha(0.65)
+
+    ax4.set_xticks([1, 2, 3])
+    ax4.set_xticklabels(labels4)
+    _style(ax4, f'Metric Distributions ({num_runs} runs)')
+    ax4.set_ylabel('Value')
+
+    # ── Super title ─────────────────────────────────────────────────
+    fig.suptitle(
+        'Reactive Tabu Search — Convergence & Run Analysis\n'
+        'S&P 500 Portfolio | Jan 2013 – Jan 2023',
+        fontsize=16, fontweight='bold',
+        color=PALETTE['text'], y=0.975,
+    )
+
+    plt.savefig(output_path, dpi=180, bbox_inches='tight',
+                facecolor=PALETTE['bg'])
+    plt.close()
+    print(f"  [\u2713] Convergence graphs saved: {output_path}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -308,7 +474,7 @@ def main():
                    tablefmt="fancy_grid"))
 
     # ── Step 2: Run RTS ───────────────────────────────────────────
-    NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", "100"))
+    NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", "30"))
     SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "786683"))
     if ALGORITHM == "SWARM":
         MAX_ITER = 2000
@@ -320,12 +486,6 @@ def main():
     TENURE = 10
     WEIGHT_CAP = 0.10
     OSC_CAP = 0.15
-    seed_rng = np.random.default_rng(SEED_POOL_SEED)
-    SEEDS = [
-        int(seed)
-        for seed in seed_rng.choice(1_000_000_000, size=NUM_RUNS, replace=False)
-    ]
-
     print(f"\n  [2] Running {ALGORITHM} RTS ({NUM_RUNS} runs)...")
     if ALGORITHM == "SWARM":
         print(f"      Iterations={MAX_ITER}, Swarm Size={SWARM_SIZE}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
@@ -334,6 +494,11 @@ def main():
     print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, Oscillation cap={OSC_CAP*100:.0f}%")
     print(f"      Seed sweep={NUM_RUNS} wide seeds, pool seed={SEED_POOL_SEED}")
 
+    seed_rng = np.random.default_rng(SEED_POOL_SEED)
+    SEEDS = [
+         int(seed)
+        for seed in seed_rng.choice(1_000_000_000, size=NUM_RUNS, replace=False)
+    ]
     # Build argument tuples for parallel execution
     run_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
@@ -354,6 +519,57 @@ def main():
                   f"Risk={result['best_risk']*100:.2f}%")
 
     print(f"\n  All {NUM_RUNS} runs complete!")
+
+    # ── All-Runs Summary Table ────────────────────────────────────
+    print("\n  " + "=" * 66)
+    print("  ALL RUNS — INDIVIDUAL RESULTS")
+    print("  " + "=" * 66)
+    run_rows = [
+        [
+            i + 1,
+            SEEDS[i],
+            f"{r['best_sharpe']:.4f}",
+            f"{r['best_return']*100:.2f}%",
+            f"{r['best_risk']*100:.2f}%",
+        ]
+        for i, r in enumerate(all_results)
+    ]
+    print(tabulate(
+        run_rows,
+        headers=["Run #", "Seed", "Sharpe", "Annual Return", "Annual Risk"],
+        tablefmt="fancy_grid",
+    ))
+
+    # ── Cross-run statistics ───────────────────────────────────────
+    all_returns = np.array([r['best_return'] for r in all_results])
+    all_risks   = np.array([r['best_risk']   for r in all_results])
+    all_sharpes_arr = np.array([r['best_sharpe'] for r in all_results])
+
+    print("\n  " + "=" * 66)
+    print(f"  RUN STATISTICS ({NUM_RUNS} runs)")
+    print("  " + "=" * 66)
+    metric_stats = [
+        ["Sharpe Ratio",
+         f"{np.mean(all_sharpes_arr):.4f}",
+         f"{np.min(all_sharpes_arr):.4f}",
+         f"{np.max(all_sharpes_arr):.4f}",
+         f"{np.std(all_sharpes_arr):.4f}"],
+        ["Annual Return",
+         f"{np.mean(all_returns)*100:.2f}%",
+         f"{np.min(all_returns)*100:.2f}%",
+         f"{np.max(all_returns)*100:.2f}%",
+         f"{np.std(all_returns)*100:.2f}%"],
+        ["Annual Risk",
+         f"{np.mean(all_risks)*100:.2f}%",
+         f"{np.min(all_risks)*100:.2f}%",
+         f"{np.max(all_risks)*100:.2f}%",
+         f"{np.std(all_risks)*100:.2f}%"],
+    ]
+    print(tabulate(
+        metric_stats,
+        headers=["Metric", "Mean", "Min", "Max", "Std Dev"],
+        tablefmt="fancy_grid",
+    ))
 
     # ── Step 3: Aggregate Results ─────────────────────────────────
     all_sharpes = [r['best_sharpe'] for r in all_results]
@@ -481,6 +697,44 @@ def main():
     stats_table = tabulate(stats_rows, headers=["Metric", "Value"],
                            tablefmt="grid")
 
+    # Full per-run table for the saved file
+    run_rows_file = [
+        [i + 1, SEEDS[i],
+         f"{r['best_sharpe']:.4f}",
+         f"{r['best_return']*100:.2f}%",
+         f"{r['best_risk']*100:.2f}%"]
+        for i, r in enumerate(all_results)
+    ]
+    all_runs_table = tabulate(
+        run_rows_file,
+        headers=["Run #", "Seed", "Sharpe", "Annual Return", "Annual Risk"],
+        tablefmt="grid",
+    )
+
+    # Extended metric stats (mean/min/max/std for all three metrics)
+    full_metric_stats = [
+        ["Sharpe Ratio",
+         f"{np.mean(all_sharpes_arr):.4f}",
+         f"{np.min(all_sharpes_arr):.4f}",
+         f"{np.max(all_sharpes_arr):.4f}",
+         f"{np.std(all_sharpes_arr):.4f}"],
+        ["Annual Return",
+         f"{np.mean(all_returns)*100:.2f}%",
+         f"{np.min(all_returns)*100:.2f}%",
+         f"{np.max(all_returns)*100:.2f}%",
+         f"{np.std(all_returns)*100:.2f}%"],
+        ["Annual Risk",
+         f"{np.mean(all_risks)*100:.2f}%",
+         f"{np.min(all_risks)*100:.2f}%",
+         f"{np.max(all_risks)*100:.2f}%",
+         f"{np.std(all_risks)*100:.2f}%"],
+    ]
+    full_stats_table = tabulate(
+        full_metric_stats,
+        headers=["Metric", "Mean", "Min", "Max", "Std Dev"],
+        tablefmt="grid",
+    )
+
     with open("rts_comparison.txt", "w") as f:
         f.write("Reactive Tabu Search — Comparative Verdict\n")
         f.write("Dataset: S&P 500 Top 10 Stocks | "
@@ -488,9 +742,13 @@ def main():
         f.write("=" * 70 + "\n\n")
         f.write(comp_table)
         f.write("\n\n")
-        f.write(f"RTS Run Statistics ({NUM_RUNS} runs)\n")
-        f.write("-" * 40 + "\n")
-        f.write(stats_table)
+        f.write(f"RTS Run Statistics ({NUM_RUNS} runs) — All Metrics\n")
+        f.write("-" * 60 + "\n")
+        f.write(full_stats_table)
+        f.write("\n\n")
+        f.write(f"Individual Run Results ({NUM_RUNS} runs)\n")
+        f.write("-" * 60 + "\n")
+        f.write(all_runs_table)
         f.write("\n")
 
     print(comp_table)
@@ -521,6 +779,10 @@ def main():
         rmpso_plot_ref, cso_plot_ref,
         returns_data, cov_daily, n_assets, RF,
     )
+
+    # ── Step 8: OUTPUT 4 — Convergence Graphs ─────────────────────
+    print("\n  [6] Generating convergence graphs...")
+    plot_convergence_graphs(all_results, best_idx, SEEDS, NUM_RUNS)
 
     # ── Final Summary ─────────────────────────────────────────────
     print("\n" + "=" * 70)
