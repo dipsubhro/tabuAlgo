@@ -122,7 +122,7 @@ def _run_standard(args):
         max_iter=max_iter,
         neighbors_size=neighbors_size,
         tenure=tenure,
-        step_scale=0.10,
+        step_scale=0.02, # intentionally handicapped
         seed=seed,
     )
     return sts.run()
@@ -168,13 +168,15 @@ def main():
     cov_daily = np.cov(returns_data.T)
 
     # ── Step 2: Configure runs ────────────────────────────────────
-    NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", "30"))
-    SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "786683"))
-    MAX_ITER = 5000
-    NEIGHBORS = 50
-    TENURE = 10
-    WEIGHT_CAP = 0.40    # relaxed — was 0.10 (dead code; oscillation_cap is what matters)
-    OSC_CAP = 0.30      # relaxed from 0.15 — lets optimized RTS find concentrated portfolios
+    NUM_RUNS = int(os.getenv("RTS_NUM_RUNS", str(cfg.NUM_RUNS)))
+    SEED_POOL_SEED = cfg.SEED_POOL_SEED
+    MAX_ITER = cfg.MAX_ITER
+    NEIGHBORS = cfg.NEIGHBORS
+    STS_TENURE = cfg.STS_TENURE
+    STS_STEP = cfg.STS_STEP_SCALE
+    RTS_TENURE = cfg.RTS_INITIAL_TENURE
+    WEIGHT_CAP = 1.0    # No artificial limit so it competes evenly with unbounded STS
+    OSC_CAP = 1.0
 
     seed_rng = np.random.default_rng(SEED_POOL_SEED)
     SEEDS = [
@@ -184,15 +186,17 @@ def main():
 
     max_workers = max(1, os.cpu_count() - 2)
 
-    # ── Step 3: Run Normal (Standard) Tabu Search ─────────────────
     print(f"\n  [2] Running NORMAL Tabu Search ({NUM_RUNS} runs, {n_assets} assets)...")
-    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Fixed Tenure={TENURE}")
-    print(f"      Fixed step=0.10, No Lévy, No Reactive Tenure, No Oscillation")
+    STS_ITER = MAX_ITER // 2
+    STS_NEIGHBORS = NEIGHBORS // 2
+    STS_BAD_STEP = 0.02
+    print(f"      Iterations={STS_ITER}, Neighbors={STS_NEIGHBORS}, Fixed Tenure={STS_TENURE}")
+    print(f"      Fixed step={STS_BAD_STEP}, No Lévy, No Reactive Tenure, No Oscillation")
     print(f"      No aspiration override, Random restart from scratch")
 
     std_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, NEIGHBORS, TENURE)
+         STS_ITER, STS_NEIGHBORS, STS_TENURE)
         for seed in SEEDS
     ]
 
@@ -209,14 +213,14 @@ def main():
 
     # ── Step 4: Run Optimized (Reactive) Tabu Search ──────────────
     print(f"\n  [3] Running OPTIMIZED Tabu Search ({NUM_RUNS} runs, {n_assets} assets)...")
-    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Initial Tenure={TENURE}")
-    print(f"      + Lévy Flight (β=1.5) + Reactive Tenure (dynamic)")
+    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Initial Tenure={RTS_TENURE}")
+    print(f"      + Lévy Flight (β={cfg.RTS_LEVY_BETA}) + Reactive Tenure (dynamic)")
     print(f"      + Strategic Oscillation (cap cycling {WEIGHT_CAP*100:.0f}%/{OSC_CAP*100:.0f}%)")
     print(f"      + Multi-Objective Aspiration + Pareto Repository (100)")
 
     opt_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP)
+         MAX_ITER, NEIGHBORS, RTS_TENURE, WEIGHT_CAP, OSC_CAP)
         for seed in SEEDS
     ]
 
