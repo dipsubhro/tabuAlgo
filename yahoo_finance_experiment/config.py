@@ -1,7 +1,7 @@
 import os
 
 # Options: "RTS" (Reactive Tabu Search), "STS" (Standard Tabu Search)
-ALGORITHM = "RTS"
+ALGORITHM = "STS"
 
 # Data and Universe
 TICKERS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'JPM', 'JNJ', 'V', 'PG', 'XOM', 'NVDA']

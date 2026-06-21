@@ -53,6 +53,7 @@ class StandardTabuSearch:
         # Initialize tracking and tabu list
         current = repair_weights(np.random.uniform(0, 1, self.n_assets))
         current_sharpe = self._sharpe(current)
+        print("Solutions-------->",  current)
         best_weights, best_sharpe = current.copy(), current_sharpe
         tabu_list = deque(maxlen=self.tenure)
 

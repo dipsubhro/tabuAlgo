@@ -685,13 +685,13 @@ def main():
     alloc_rows.sort(key=lambda x: x['alloc_val'], reverse=True)
 
     final_alloc_rows = [
-        [r['ticker'], r['name'], r['alloc_str'], r['ret_str'], r['risk_str'], r['sharpe_val']]
+        [r['ticker'], r['name'], r['alloc_str']]
         for r in alloc_rows
     ]
 
     alloc_table_str = tabulate(
         final_alloc_rows,
-        headers=["Ticker", "Stock Name", "Allocation", "Stock Return", "Stock Risk", "Stock Sharpe"],
+        headers=["Ticker", "Stock Name", "Allocation"],
         tablefmt="pipe",
     )
     print(alloc_table_str)
@@ -800,19 +800,21 @@ def main():
         f.write("Dataset: S&P 500 Top 10 Stocks | "
                 "Period: 2013–2023 | RF=2%\n")
         f.write("=" * 70 + "\n\n")
-        f.write(comp_table)
-        f.write("\n\n")
-        f.write("Best Portfolio — Stock-Level Allocation Detail\n")
+        f.write(f"Individual Run Results ({NUM_RUNS} runs)\n")
         f.write("-" * 60 + "\n")
-        f.write(alloc_table_str)
+        f.write(all_runs_table)
         f.write("\n\n")
         f.write(f"{ALGORITHM} Run Statistics ({NUM_RUNS} runs) — All Metrics\n")
         f.write("-" * 60 + "\n")
         f.write(full_stats_table)
         f.write("\n\n")
-        f.write(f"Individual Run Results ({NUM_RUNS} runs)\n")
+        f.write("Best Portfolio — Overview\n")
         f.write("-" * 60 + "\n")
-        f.write(all_runs_table)
+        f.write(comp_table)
+        f.write("\n\n")
+        f.write("Best Portfolio — Stock-Level Allocation Detail\n")
+        f.write("-" * 60 + "\n")
+        f.write(alloc_table_str)
         f.write("\n")
 
     print(comp_table)
