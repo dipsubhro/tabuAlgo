@@ -1,7 +1,8 @@
 import numpy as np
+import yahoo_finance_experiment.config as cfg
 
 def repair_weights(weights, cap=None):
-    min_w = 0.01
+    min_w = getattr(cfg, 'MIN_WEIGHT', 0.0)
     w = np.clip(np.asarray(weights, float), 0.0, cap)
     n = len(w)
     s = w.sum()
@@ -32,7 +33,7 @@ def calc_all_metrics(weights, returns_data, cov_matrix, rf=0.02):
             'max_drawdown': float(np.min((c - np.maximum.accumulate(c)) / np.maximum.accumulate(c)))}
 
 def repair_weights_2d(weights_2d, cap=None):
-    min_w = 0.01
+    min_w = getattr(cfg, 'MIN_WEIGHT', 0.0)
     w = np.clip(weights_2d, 0.0, cap)
     tot = w.sum(axis=1, keepdims=True)
     mask = (tot <= 0).flatten()

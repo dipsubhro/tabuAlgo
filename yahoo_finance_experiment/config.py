@@ -13,6 +13,7 @@ SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "786683"))
 # Shared Parameters (RTS & STS)
 MAX_ITER = 3000
 NEIGHBORS = 100
+MIN_WEIGHT = 0.00001  # Set > 0.0 to enforce a minimum allocation (e.g., 0.01 for 1%)
 
 # STS Specific Parameters
 STS_TENURE = 10
