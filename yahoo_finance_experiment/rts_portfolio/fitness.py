@@ -1,8 +1,12 @@
 import numpy as np
 
 def repair_weights(weights, cap=None):
+    min_w = 0.01
     w = np.clip(np.asarray(weights, float), 0.0, cap)
-    return w / w.sum() if w.sum() > 0 else np.full(len(w), 1.0/len(w))
+    n = len(w)
+    s = w.sum()
+    w = w / s if s > 0 else np.full(n, 1.0/n)
+    return min_w + w * max(0.0, 1.0 - n * min_w)
 
 repair_weights_capped = repair_weights
 
@@ -28,11 +32,14 @@ def calc_all_metrics(weights, returns_data, cov_matrix, rf=0.02):
             'max_drawdown': float(np.min((c - np.maximum.accumulate(c)) / np.maximum.accumulate(c)))}
 
 def repair_weights_2d(weights_2d, cap=None):
+    min_w = 0.01
     w = np.clip(weights_2d, 0.0, cap)
     tot = w.sum(axis=1, keepdims=True)
     mask = (tot <= 0).flatten()
-    if np.any(mask): w[mask, :], tot[mask, 0] = 1.0/w.shape[1], 1.0
-    return w / tot
+    n = w.shape[1]
+    if np.any(mask): w[mask, :], tot[mask, 0] = 1.0/n, 1.0
+    w = w / tot
+    return min_w + w * max(0.0, 1.0 - n * min_w)
 
 repair_weights_capped_2d = repair_weights_2d
 
