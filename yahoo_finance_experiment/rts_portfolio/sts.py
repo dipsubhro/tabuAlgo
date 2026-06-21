@@ -7,7 +7,6 @@ A textbook baseline Tabu Search with NO enhancements:
   - Fixed tabu tenure (no reactive/dynamic adjustment)
   - No strategic oscillation (no constraint boundary exploration)
   - Strict tabu — NO aspiration criteria at all
-  - No Pareto repository
   - Completely random restart on stagnation (no intelligent guidance)
   - Fixed step size (no adaptive decay)
 
@@ -53,7 +52,7 @@ class StandardTabuSearch:
         # Initialize tracking and tabu list
         current = repair_weights(np.random.uniform(0, 1, self.n_assets))
         current_sharpe = self._sharpe(current)
-        print("Solutions-------->",  current)
+        # print("Solutions-------->",  current)
         best_weights, best_sharpe = current.copy(), current_sharpe
         tabu_list = deque(maxlen=self.tenure)
 

@@ -8,12 +8,14 @@ TICKERS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'JPM', 'JNJ', 'V', 'PG', 'XOM', 'NVD
 DATA_START, DATA_END, DATA_COVERAGE_THRESHOLD = '2013-01-01', '2023-01-01', 0.90
 RF = 0.02
 NUM_RUNS = 30
-SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "786683"))
+SEED_POOL_SEED = int(os.getenv("RTS_SEED_POOL_SEED", "9547778398"))
+#786683
 
 # Shared Parameters (RTS & STS)
 MAX_ITER = 3000
 NEIGHBORS = 100
-MIN_WEIGHT = 0.00001  # Set > 0.0 to enforce a minimum allocation (e.g., 0.01 for 1%)
+MIN_WEIGHT = 0.00  # Set > 0.0 to enforce a minimum allocation (e.g., 0.01 for 1%)
+MAX_WEIGHT = 1.0  # Set < 1.0 to enforce a maximum allocation (e.g., 0.30 for 30%)
 
 # STS Specific Parameters
 STS_TENURE = 10
@@ -34,5 +36,5 @@ TICKER_CSV = {t: os.path.join(DATA_DIR, f"{t}.csv") for t in TICKERS}
 
 OUT_CONVERGENCE_TXT   = os.path.join(OUTPUTS_DIR, "rts_convergence.txt")
 OUT_COMPARISON_TXT    = os.path.join(OUTPUTS_DIR, "rts_comparison.txt")
-OUT_PARETO_PNG        = os.path.join(OUTPUTS_DIR, "rts_pareto_front.png")
 OUT_CONVERGENCE_GRAPH = os.path.join(OUTPUTS_DIR, "rts_convergence_graphs.png")
+OUT_RUN_DATA_JSON     = os.path.join(OUTPUTS_DIR, "rts_run_data.json")

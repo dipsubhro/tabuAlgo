@@ -3,11 +3,14 @@ import yahoo_finance_experiment.config as cfg
 
 def repair_weights(weights, cap=None):
     min_w = getattr(cfg, 'MIN_WEIGHT', 0.0)
-    w = np.clip(np.asarray(weights, float), 0.0, cap)
-    n = len(w)
-    s = w.sum()
-    w = w / s if s > 0 else np.full(n, 1.0/n)
-    return min_w + w * max(0.0, 1.0 - n * min_w)
+    max_w = getattr(cfg, 'MAX_WEIGHT', cap if cap is not None else 1.0)
+    w = np.clip(np.asarray(weights, float), min_w, max_w)
+    for _ in range(10):
+        s = w.sum()
+        if s <= 0: break
+        w = w / s
+        w = np.clip(w, min_w, max_w)
+    return w / w.sum() if w.sum() > 0 else np.full(len(w), 1.0/len(w))
 
 repair_weights_capped = repair_weights
 
@@ -34,13 +37,16 @@ def calc_all_metrics(weights, returns_data, cov_matrix, rf=0.02):
 
 def repair_weights_2d(weights_2d, cap=None):
     min_w = getattr(cfg, 'MIN_WEIGHT', 0.0)
-    w = np.clip(weights_2d, 0.0, cap)
+    max_w = getattr(cfg, 'MAX_WEIGHT', cap if cap is not None else 1.0)
+    w = np.clip(weights_2d, min_w, max_w)
+    for _ in range(10):
+        tot = w.sum(axis=1, keepdims=True)
+        tot[tot <= 0] = 1.0
+        w = w / tot
+        w = np.clip(w, min_w, max_w)
     tot = w.sum(axis=1, keepdims=True)
-    mask = (tot <= 0).flatten()
-    n = w.shape[1]
-    if np.any(mask): w[mask, :], tot[mask, 0] = 1.0/n, 1.0
-    w = w / tot
-    return min_w + w * max(0.0, 1.0 - n * min_w)
+    tot[tot <= 0] = 1.0
+    return w / tot
 
 repair_weights_capped_2d = repair_weights_2d
 

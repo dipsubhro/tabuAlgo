@@ -215,7 +215,7 @@ def main():
     print(f"      Iterations={RTS_ITER}, Neighbors={RTS_NEIGHBORS}, Initial Tenure={RTS_TENURE}")
     print(f"      + Lévy Flight (β={cfg.RTS_LEVY_BETA}) + Reactive Tenure (dynamic)")
     print(f"      + Strategic Oscillation (cap cycling {RTS_WEIGHT_CAP*100:.0f}%/{RTS_OSC_CAP*100:.0f}%)")
-    print(f"      + Multi-Objective Aspiration + Pareto Repository (100)")
+    print(f"      + Multi-Objective Aspiration")
 
     opt_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
