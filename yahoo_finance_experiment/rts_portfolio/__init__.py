@@ -1,7 +1,7 @@
-from .single_rts_engine import SingleReactiveTabuSearch
-from .swarm_rts_engine import SwarmReactiveTabuSearch
+from .rts import SingleReactiveTabuSearch
+from .sts import StandardTabuSearch
 
 __all__ = [
     'SingleReactiveTabuSearch',
-    'SwarmReactiveTabuSearch'
+    'StandardTabuSearch',
 ]

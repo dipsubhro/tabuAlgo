@@ -1,18 +1,6 @@
-"""
-Reactive Tabu Search — S&P 500 Portfolio Optimization Runner
-=============================================================
-
-Uses the EXACT same dataset and calculations as the RMPSO reference script
-(yfdataset.py) for a fair head-to-head comparison.
-
-Produces three required outputs:
-  1. Convergence Table   → rts_convergence.txt
-  2. Comparative Verdict → rts_comparison.txt  (RTS vs RMPSO vs CSO)
-  3. Pareto Front Plot   → rts_pareto_front.png
-"""
-
 import sys
 import os
+import json
 import numpy as np
 import random
 import warnings
@@ -25,77 +13,97 @@ warnings.filterwarnings('ignore')
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from yahoo_finance_experiment.rts_portfolio import SingleReactiveTabuSearch, SwarmReactiveTabuSearch
-
-# ── ALGORITHM SELECTOR ──
-ALGORITHM = "SINGLE"  # Options: "SINGLE" or "SWARM"
-
+from yahoo_finance_experiment.rts_portfolio import SingleReactiveTabuSearch
+from yahoo_finance_experiment.rts_portfolio import StandardTabuSearch
 from yahoo_finance_experiment.rts_portfolio.fitness import (
     repair_weights, calc_annual_return, calc_annual_risk,
     calc_all_metrics,
 )
+import yahoo_finance_experiment.config as cfg
+
+# ── ALGORITHM SELECTOR: edit ALGORITHM in config.py ──
+#    "RTS" = Reactive Tabu Search  (Lévy + Reactive Tenure + Oscillation)
+#    "STS" = Standard Tabu Search  (baseline, fixed tenure, Gaussian steps)
+ALGORITHM = cfg.ALGORITHM
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # DATA — Reuse the RMPSO reference download function
 # ═══════════════════════════════════════════════════════════════════════════
 
-def download_stock_data():
+def load_stock_data():
     """
-    Downloads 10 years of real S&P 500 stock data from Yahoo Finance.
-    Same period as the target paper: Jan 2013 - Jan 2023.
-    Identical to the function in yfdataset.py.
-    """
-    try:
-        import yfinance as yf
-    except ImportError:
-        print("  [!] yfinance not installed. Run: uv add yfinance")
-        sys.exit(1)
+    Load daily returns for the configured stock universe.
 
+    Source: data/combined_prices.csv  — unified close prices (all positive),
+            built by combining the Close column from each per-ticker CSV.
+
+    The function reads the close prices and computes pct_change() internally
+    so the algorithm always works from the cleanest source data.
+
+    Falls back to downloading from Yahoo Finance if combined_prices.csv is
+    missing and no individual ticker CSVs are present.
+
+    Returns
+    -------
+    stock_names   : list[str]
+    returns_array : np.ndarray  shape (trading_days, n_assets)
+    """
     import pandas as pd
 
-    tickers = [
-        'AAPL',   # Apple         — Technology
-        'MSFT',   # Microsoft     — Technology
-        'GOOGL',  # Alphabet      — Technology
-        'AMZN',   # Amazon        — Consumer
-        'JPM',    # JPMorgan      — Finance
-        'JNJ',    # Johnson&Johnson — Healthcare
-        'V',      # Visa          — Finance
-        'PG',     # Procter&Gamble — Consumer
-        'XOM',    # ExxonMobil    — Energy
-        'NVDA',   # NVIDIA        — Technology
-    ]
+    combined_path = cfg.COMBINED_PRICES_CSV
 
-    print("  Downloading data from Yahoo Finance...")
-    print(f"  Tickers : {tickers}")
-    print(f"  Period  : Jan 2013 – Jan 2023 (same as target paper)")
+    if os.path.exists(combined_path):
+        # ── Load unified close prices & compute returns ────────────
+        print(f"  Loading combined close prices: {combined_path}")
+        close = pd.read_csv(combined_path, index_col=0, parse_dates=True)
+        print(f"  ✓ Close prices : {close.shape[1]} tickers, {close.shape[0]} rows")
+        print(f"  ✓ Date range   : {close.index[0].date()} → {close.index[-1].date()}")
 
-    raw = yf.download(
-        tickers,
-        start='2013-01-01',
-        end='2023-01-01',
-        auto_adjust=True,
-        progress=False,
-    )
+        # Compute daily returns from close prices
+        returns       = close.pct_change().dropna()
+        stock_names   = list(returns.columns)
+        returns_array = returns.values
 
-    if isinstance(raw.columns, pd.MultiIndex):
-        data = raw['Close']
+        print(f"  ✓ Daily returns: {returns.shape[0]} trading days")
+
     else:
-        data = raw
+        # ── Fallback: download from Yahoo Finance ──────────────────
+        try:
+            import yfinance as yf
+        except ImportError:
+            print("  [!] yfinance not installed. Run: uv add yfinance")
+            sys.exit(1)
 
-    data = data.dropna(axis=1, thresh=int(0.9 * len(data)))
-    data = data.dropna()
+        print("  combined_prices.csv not found — downloading from Yahoo Finance...")
+        print(f"  Tickers : {cfg.TICKERS}")
+        print(f"  Period  : {cfg.DATA_START} → {cfg.DATA_END}")
 
-    returns = data.pct_change().dropna()
-    stock_names = list(returns.columns)
-    returns_array = returns.values
+        raw = yf.download(
+            cfg.TICKERS,
+            start=cfg.DATA_START,
+            end=cfg.DATA_END,
+            auto_adjust=True,
+            progress=False,
+        )
 
-    print(f"  Downloaded : {len(stock_names)} stocks")
-    print(f"  Trading days: {len(returns_array)}")
-    print(f"  Date range  : {returns.index[0].date()} to {returns.index[-1].date()}")
+        close = raw['Close'] if isinstance(raw.columns, pd.MultiIndex) else raw
+        close = close.dropna(axis=1, thresh=int(cfg.DATA_COVERAGE_THRESHOLD * len(close)))
+        close = close.dropna()
+
+        # Save as combined_prices.csv for future runs
+        os.makedirs(os.path.dirname(combined_path), exist_ok=True)
+        close.to_csv(combined_path)
+        print(f"  ✓ Saved combined_prices.csv: {combined_path}")
+
+        returns       = close.pct_change().dropna()
+        stock_names   = list(returns.columns)
+        returns_array = returns.values
+
+        print(f"  ✓ Downloaded : {len(stock_names)} stocks, {len(returns_array)} trading days")
 
     return stock_names, returns_array
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -103,26 +111,23 @@ def download_stock_data():
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _run_single(args):
-    """Run a single RTS instance. Designed for ProcessPoolExecutor."""
+    """Run one search instance. Works for both RTS and STS."""
     (returns_data, cov_matrix, n_assets, seed, rf,
-     max_iter, swarm_size, neighbors_size, initial_tenure,
-     weight_cap, oscillation_cap, algo_type) = args
+     max_iter, neighbors_size, algo_type) = args
 
-    if algo_type == "SWARM":
-        rts = SwarmReactiveTabuSearch(
+    if algo_type == "STS":
+        rts = StandardTabuSearch(
             returns_data=returns_data,
             cov_matrix=cov_matrix,
             n_assets=n_assets,
             rf=rf,
             max_iter=max_iter,
-            swarm_size=swarm_size,
             neighbors_size=neighbors_size,
-            initial_tenure=initial_tenure,
-            weight_cap=weight_cap,
-            oscillation_cap=oscillation_cap,
+            tenure=cfg.STS_TENURE,
+            step_scale=cfg.STS_STEP_SCALE,
             seed=seed,
         )
-    else:
+    else:  # "RTS"
         rts = SingleReactiveTabuSearch(
             returns_data=returns_data,
             cov_matrix=cov_matrix,
@@ -130,141 +135,14 @@ def _run_single(args):
             rf=rf,
             max_iter=max_iter,
             neighbors_size=neighbors_size,
-            initial_tenure=initial_tenure,
-            weight_cap=weight_cap,
-            oscillation_cap=oscillation_cap,
+            initial_tenure=cfg.RTS_INITIAL_TENURE,
+            weight_cap=cfg.RTS_WEIGHT_CAP,
+            oscillation_cap=cfg.RTS_OSC_CAP,
+            beta=cfg.RTS_LEVY_BETA,
+            cycle_threshold=cfg.RTS_CYCLE_THRESHOLD,
             seed=seed,
         )
     return rts.run()
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# PARETO FRONT UTILITIES
-# ═══════════════════════════════════════════════════════════════════════════
-
-def _build_pareto_front(points):
-    """
-    Extract non-dominated (risk, return) points.
-    A point dominates another if it has higher return AND lower risk.
-    """
-    pts = np.array(points)  # (M, 3) — risk, return, sharpe
-    # Sort by risk ascending
-    sorted_idx = np.argsort(pts[:, 0])
-    pts_sorted = pts[sorted_idx]
-
-    front = []
-    max_ret = -np.inf
-    for risk, ret, sharpe in pts_sorted:
-        if ret > max_ret:
-            front.append((risk, ret, sharpe))
-            max_ret = ret
-
-    return front
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# PLOTTING
-# ═══════════════════════════════════════════════════════════════════════════
-
-def plot_pareto_front(all_explored, pareto_front, best_result,
-                      rmpso_ref, cso_ref,
-                      returns_data, cov_matrix, n_assets, rf,
-                      output_path='rts_pareto_front.png'):
-    """
-    Generate the required Pareto Front plot showing risk-return trade-off
-    of RTS results compared to a random-walk baseline.
-    """
-    import matplotlib.pyplot as plt
-    import matplotlib
-
-    matplotlib.rcParams['font.family'] = 'DejaVu Sans'
-
-    fig, ax = plt.subplots(figsize=(14, 9))
-
-    # ── Random-walk baseline (1000 random portfolios) ──────────────
-    np.random.seed(42)
-    rand_risks, rand_rets = [], []
-    for _ in range(2000):
-        w = repair_weights(np.random.uniform(0, 1, n_assets))
-        rand_rets.append(calc_annual_return(w, returns_data) * 100)
-        rand_risks.append(calc_annual_risk(w, cov_matrix) * 100)
-    ax.scatter(rand_risks, rand_rets, alpha=0.12, s=8, color='#bdc3c7',
-               label='Random Portfolios (baseline)', zorder=1)
-
-    # ── All RTS explored points ────────────────────────────────────
-    # Subsample for performance (plot at most 5000 points)
-    explored = np.array(all_explored)
-    if len(explored) > 5000:
-        idx = np.random.choice(len(explored), 5000, replace=False)
-        explored = explored[idx]
-    ax.scatter(explored[:, 0] * 100, explored[:, 1] * 100,
-               alpha=0.06, s=4, color='#3498db',
-               label='RTS Explored Solutions', zorder=2)
-
-    # ── Pareto front line ──────────────────────────────────────────
-    pf = np.array(pareto_front)
-    sort_idx = np.argsort(pf[:, 0])
-    ax.plot(pf[sort_idx, 0] * 100, pf[sort_idx, 1] * 100,
-            'o-', color='#e74c3c', markersize=5, linewidth=2.5,
-            label='RTS Pareto Front', zorder=5)
-
-    # ── Best RTS solution (max Sharpe) ─────────────────────────────
-    ax.scatter(best_result['best_risk'] * 100,
-               best_result['best_return'] * 100,
-               marker='*', s=400, color='#e74c3c', edgecolors='black',
-               linewidths=1.5, zorder=7,
-               label=f"★ RTS Best (Sharpe={best_result['best_sharpe']:.3f})")
-
-    # ── RMPSO reference point ──────────────────────────────────────
-    if rmpso_ref:
-        ax.scatter(rmpso_ref['risk'] * 100, rmpso_ref['return'] * 100,
-                   marker='D', s=180, color='#2ecc71', edgecolors='black',
-                   linewidths=1.5, zorder=6,
-                   label=f"RMPSO (Sharpe={rmpso_ref['sharpe']:.3f})")
-        ax.annotate('RMPSO', (rmpso_ref['risk'] * 100, rmpso_ref['return'] * 100),
-                    textcoords='offset points', xytext=(8, -12),
-                    fontsize=9, fontweight='bold', color='#27ae60')
-
-    # ── CSO reference point ────────────────────────────────────────
-    if cso_ref:
-        ax.scatter(cso_ref['risk'] * 100, cso_ref['return'] * 100,
-                   marker='X', s=180, color='#9b59b6', edgecolors='black',
-                   linewidths=1.5, zorder=6,
-                   label=f"CSO (Sharpe={cso_ref['sharpe']:.3f})")
-        ax.annotate('CSO', (cso_ref['risk'] * 100, cso_ref['return'] * 100),
-                    textcoords='offset points', xytext=(8, 5),
-                    fontsize=9, fontweight='bold', color='#8e44ad')
-
-    # ── Annotate best RTS point ────────────────────────────────────
-    ax.annotate(
-        f"RTS Best ★\n"
-        f"Return: {best_result['best_return']*100:.2f}%\n"
-        f"Risk: {best_result['best_risk']*100:.2f}%\n"
-        f"Sharpe: {best_result['best_sharpe']:.4f}",
-        (best_result['best_risk'] * 100, best_result['best_return'] * 100),
-        textcoords='offset points', xytext=(15, 15),
-        fontsize=9, fontweight='bold', color='#c0392b',
-        arrowprops=dict(arrowstyle='->', color='#c0392b', lw=1.5),
-        bbox=dict(boxstyle='round,pad=0.4', facecolor='#fadbd8',
-                  edgecolor='#e74c3c', alpha=0.9),
-    )
-
-    # ── Style ──────────────────────────────────────────────────────
-    ax.set_xlabel('Annual Risk / Volatility (%)', fontsize=13, fontweight='bold')
-    ax.set_ylabel('Expected Annual Return (%)', fontsize=13, fontweight='bold')
-    ax.set_title(
-        'Reactive Tabu Search — Pareto Front (Risk vs Return)\n'
-        'S&P 500 Portfolio | Jan 2013 – Jan 2023 | Rf = 2%',
-        fontsize=15, fontweight='bold', pad=12,
-    )
-    ax.legend(loc='upper left', fontsize=10, framealpha=0.9)
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=200, bbox_inches='tight', facecolor='white')
-    plt.close()
-    print(f"  [✓] Pareto front plot saved: {output_path}")
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN
@@ -272,21 +150,21 @@ def plot_pareto_front(all_explored, pareto_front, best_result,
 
 def main():
     print("\n" + "=" * 70)
-    if ALGORITHM == "SWARM":
-        print("  MULTI-SOLUTION SWARM RTS — S&P 500 Portfolio Optimization")
-        print("  Modules: Lévy Flight | Swarm Memory | Strategic Oscillation")
+    if ALGORITHM == "STS":
+        print("  STANDARD TABU SEARCH (STS) — S&P 500 Portfolio Optimization")
+        print("  Baseline: fixed tenure, Gaussian neighbourhood, no enhancements")
     else:
-        print("  SINGLE-SOLUTION RTS — S&P 500 Portfolio Optimization")
+        print("  REACTIVE TABU SEARCH (RTS) — S&P 500 Portfolio Optimization")
         print("  Modules: Lévy Flight | Reactive Tenure | Strategic Oscillation")
-    print("           | Multi-Objective Aspiration")
+        print("           | Multi-Objective Aspiration")
     print("  Dataset: S&P 500, Jan 2013 – Jan 2023")
     print("=" * 70)
 
-    RF = 0.02
+    RF = cfg.RF
 
     # ── Step 1: Get Data ──────────────────────────────────────────
     print("\n  [1] Fetching real market data...")
-    stock_names, returns_data = download_stock_data()
+    stock_names, returns_data = load_stock_data()
     n_assets = len(stock_names)
 
     cov_daily = np.cov(returns_data.T)
@@ -308,30 +186,25 @@ def main():
                    tablefmt="fancy_grid"))
 
     # ── Step 2: Run RTS ───────────────────────────────────────────
-    NUM_RUNS = 30
-    if ALGORITHM == "SWARM":
-        MAX_ITER = 2000
-        SWARM_SIZE = 10
-    else:
-        MAX_ITER = 5000
-        SWARM_SIZE = 1
-    NEIGHBORS = 50
-    TENURE = 10
-    WEIGHT_CAP = 0.10
-    OSC_CAP = 0.15
-    SEEDS = list(range(42, 42 + NUM_RUNS))
+    NUM_RUNS       = cfg.NUM_RUNS
+    SEED_POOL_SEED = cfg.SEED_POOL_SEED
+    MAX_ITER       = cfg.MAX_ITER
+    NEIGHBORS      = cfg.NEIGHBORS
 
-    print(f"\n  [2] Running {ALGORITHM} RTS ({NUM_RUNS} runs)...")
-    if ALGORITHM == "SWARM":
-        print(f"      Iterations={MAX_ITER}, Swarm Size={SWARM_SIZE}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
+    print(f"\n  [2] Running {ALGORITHM} ({NUM_RUNS} runs)...")
+    print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}")
+    if ALGORITHM == "RTS":
+        print(f"      Tenure={cfg.RTS_INITIAL_TENURE}, Weight cap={cfg.RTS_WEIGHT_CAP*100:.0f}%, Oscillation cap={cfg.RTS_OSC_CAP*100:.0f}%")
     else:
-        print(f"      Iterations={MAX_ITER}, Neighbors={NEIGHBORS}, Tenure={TENURE}")
-    print(f"      Weight cap={WEIGHT_CAP*100:.0f}%, Oscillation cap={OSC_CAP*100:.0f}%")
+        print(f"      Tenure={cfg.STS_TENURE}, Step scale={cfg.STS_STEP_SCALE:.2f}")
+    print(f"      Seed pool seed={SEED_POOL_SEED}")
 
-    # Build argument tuples for parallel execution
+    seed_rng = np.random.default_rng(SEED_POOL_SEED)
+    SEEDS = [int(s) for s in seed_rng.choice(1_000_000_000, size=NUM_RUNS, replace=False)]
+
     run_args = [
         (returns_data, cov_daily, n_assets, seed, RF,
-         MAX_ITER, SWARM_SIZE, NEIGHBORS, TENURE, WEIGHT_CAP, OSC_CAP, ALGORITHM)
+         MAX_ITER, NEIGHBORS, ALGORITHM)
         for seed in SEEDS
     ]
 
@@ -349,6 +222,11 @@ def main():
 
     print(f"\n  All {NUM_RUNS} runs complete!")
 
+    # ── Cross-run statistics ───────────────────────────────────────
+    all_returns = np.array([r['best_return'] for r in all_results])
+    all_risks   = np.array([r['best_risk']   for r in all_results])
+    all_sharpes_arr = np.array([r['best_sharpe'] for r in all_results])
+
     # ── Step 3: Aggregate Results ─────────────────────────────────
     all_sharpes = [r['best_sharpe'] for r in all_results]
     best_idx = int(np.argmax(all_sharpes))
@@ -358,113 +236,136 @@ def main():
         best_result['best_weights'], returns_data, cov_daily, RF
     )
 
+    # ── All-Runs Summary Table ────────────────────────────────────
+    print("\n  " + "=" * 66)
+    print("  ALL RUNS — INDIVIDUAL RESULTS")
+    print("  " + "=" * 66)
+    run_rows = [
+        [
+            f"{i + 1} (best)" if i == best_idx else i + 1,
+            SEEDS[i],
+            f"{r['best_return']*100:.2f}%",
+            f"{r['best_risk']*100:.2f}%",
+            f"{r['best_sharpe']:.4f}",
+        ]
+        for i, r in enumerate(all_results)
+    ]
+    print(tabulate(
+        run_rows,
+        headers=["Run #", "Seed", "Annual Return", "Annual Risk", "Sharpe"],
+        tablefmt="fancy_grid",
+    ))
+
+    print("\n  " + "=" * 66)
+    print(f"  RUN STATISTICS ({NUM_RUNS} runs)")
+    print("  " + "=" * 66)
+    metric_stats = [
+        ["Sharpe Ratio",
+         f"{np.mean(all_sharpes_arr):.4f}",
+         f"{np.min(all_sharpes_arr):.4f}",
+         f"{np.max(all_sharpes_arr):.4f}",
+         f"{np.std(all_sharpes_arr):.4f}"],
+    ]
+    print(tabulate(
+        metric_stats,
+        headers=["Metric", "Mean", "Min", "Max", "Std Dev"],
+        tablefmt="fancy_grid",
+    ))
+
     print(f"\n  Best Run #{best_idx + 1}:")
     print(f"    Sharpe Ratio : {best_result['best_sharpe']:.4f}")
     print(f"    Annual Return: {best_result['best_return']*100:.2f}%")
     print(f"    Annual Risk  : {best_result['best_risk']*100:.2f}%")
     print(f"    Max Drawdown : {rts_metrics['max_drawdown']*100:.2f}%")
 
-    # ── Step 4: Print portfolio weights ───────────────────────────
-    print("\n  " + "=" * 50)
-    print("  RTS OPTIMAL PORTFOLIO WEIGHTS")
-    print("  " + "=" * 50)
-    weight_table = []
-    for name, w in zip(stock_names, best_result['best_weights']):
-        if w > 0.001:
-            weight_table.append([name, f"{w*100:.2f}%"])
-    weight_table.append(["── TOTAL", "100.00%"])
-    print(tabulate(weight_table,
-                   headers=["Stock", "Allocation"],
-                   tablefmt="fancy_grid"))
+    # ── Step 4: Print per-stock allocation detail ───────────────────
+    # ── Per-stock allocation detail table ──────────────────────────
+    print("\n  " + "=" * 70)
+    print("  BEST PORTFOLIO — STOCK-LEVEL ALLOCATION DETAIL")
+    print("  " + "=" * 70)
+
+    STOCK_FULL_NAMES = {
+        'AAPL': 'Apple Inc.',
+        'MSFT': 'Microsoft Corporation',
+        'GOOGL': 'Alphabet Inc.',
+        'AMZN': 'Amazon.com, Inc.',
+        'JPM': 'JPMorgan Chase & Co.',
+        'JNJ': 'Johnson & Johnson',
+        'V': 'Visa Inc.',
+        'PG': 'The Procter & Gamble Company',
+        'XOM': 'Exxon Mobil Corporation',
+        'NVDA': 'NVIDIA Corporation',
+    }
+
+    alloc_rows = []
+    for name, w, r_ann, v_ann in zip(
+            stock_names, best_result['best_weights'], mean_returns, std_returns):
+        ind_sharpe = (r_ann - RF) / v_ann if v_ann > 0 else float('nan')
+        full_name = STOCK_FULL_NAMES.get(name, name)
+        alloc_rows.append({
+            'ticker': name,
+            'name': full_name,
+            'alloc_val': w,
+            'alloc_str': f"{w*100:.2f}%",
+            'ret_str': f"{r_ann*100:.2f}%",
+            'risk_str': f"{v_ann*100:.2f}%",
+            'sharpe_val': round(ind_sharpe, 4),
+        })
+
+    # Sort by allocation descending
+    alloc_rows.sort(key=lambda x: x['alloc_val'], reverse=True)
+
+    final_alloc_rows = [
+        [r['ticker'], r['name'], r['alloc_str']]
+        for r in alloc_rows
+    ]
+
+    alloc_table_str = tabulate(
+        final_alloc_rows,
+        headers=["Ticker", "Stock Name", "Allocation"],
+        tablefmt="pipe",
+    )
+    print(alloc_table_str)
 
     # ── Step 5: OUTPUT 1 — Convergence Table ──────────────────────
     print("\n  [3] Generating convergence table...")
     best_conv = best_result['convergence_log']
 
     conv_rows = []
-    for (it, b_sharpe, c_sharpe, ten, phase) in best_conv:
-        conv_rows.append([it, f"{b_sharpe:.4f}", f"{c_sharpe:.4f}",
-                          ten, phase])
+    for entry in best_conv:
+        it = entry[0]
+        b_sharpe = entry[1]
+        c_sharpe = entry[2]
+        
+        if ALGORITHM == "RTS":
+            ten = entry[3] if len(entry) > 3 else cfg.RTS_INITIAL_TENURE
+            phase = entry[4] if len(entry) > 4 else "Normal"
+            conv_rows.append([it, f"{b_sharpe:.4f}", f"{c_sharpe:.4f}", ten, phase])
+        else:
+            conv_rows.append([it, f"{b_sharpe:.4f}", f"{c_sharpe:.4f}"])
+
+    headers = ["Iteration", "Best Sharpe", "Current Sharpe"]
+    if ALGORITHM == "RTS":
+        headers.extend(["Tenure", "Phase"])
 
     conv_table = tabulate(
         conv_rows,
-        headers=["Iteration", "Best Sharpe", "Current Sharpe",
-                 "Tenure", "Phase"],
+        headers=headers,
         tablefmt="grid",
     )
 
-    with open("rts_convergence.txt", "w") as f:
-        f.write("Reactive Tabu Search — Convergence Log\n")
+    with open(cfg.OUT_CONVERGENCE_TXT, "w") as f:
+        f.write(f"{ALGORITHM} — Convergence Log\n")
         f.write(f"Best Run (Seed {SEEDS[best_idx]})\n")
         f.write("=" * 70 + "\n\n")
         f.write(conv_table)
         f.write("\n")
-    print("  [✓] Convergence table saved: rts_convergence.txt")
+    print(f"  [✓] Convergence table saved: {cfg.OUT_CONVERGENCE_TXT}")
 
-    # ── Step 6: OUTPUT 2 — Comparative Verdict ────────────────────
-    print("\n  [4] Building comparison table...")
+    # ── Step 6: OUTPUT 2 — Final Metrics ─────────────────────────
+    print("\n  [4] Building summary table...")
 
-    # Published reference values
-    rmpso_ref = {'return': None, 'risk': None, 'sharpe': 1.159}
-    cso_ref = {'return': 0.168, 'risk': 0.187, 'sharpe': 0.950}
-
-    # Paper results (from the reference script)
-    paper_results = {
-        'BFO':       {'return': 0.142, 'risk': 0.198, 'sharpe': 0.617},
-        'FWA':       {'return': 0.131, 'risk': 0.201, 'sharpe': 0.552},
-        'CSO':       {'return': 0.168, 'risk': 0.187, 'sharpe': 0.950},
-        'Bat':       {'return': 0.124, 'risk': 0.215, 'sharpe': 0.484},
-        'mean-CVaR': {'return': 0.098, 'risk': 0.142, 'sharpe': 0.549},
-    }
-
-    comparison_rows = []
-
-    # RMPSO reference (from user's own run — Sharpe 1.159)
-    comparison_rows.append([
-        "RMPSO (Reference)",
-        "—", "—",
-        f"{rmpso_ref['sharpe']:.4f}",
-        "—",
-        "Published / Own Run",
-    ])
-
-    # Paper methods
-    for method, m in paper_results.items():
-        comparison_rows.append([
-            f"{method} (paper)",
-            f"{m['return']*100:.2f}%",
-            f"{m['risk']*100:.2f}%",
-            f"{m['sharpe']:.4f}",
-            "—",
-            "Published",
-        ])
-
-    # Our RTS
-    verdict = ""
-    if rts_metrics['sharpe'] > rmpso_ref['sharpe']:
-        verdict = "★ BEATS RMPSO"
-    elif rts_metrics['sharpe'] > cso_ref['sharpe']:
-        verdict = "Beats CSO"
-    else:
-        verdict = "—"
-
-    comparison_rows.append([
-        "★ RTS (Ours)",
-        f"{rts_metrics['return']*100:.2f}%",
-        f"{rts_metrics['risk']*100:.2f}%",
-        f"{rts_metrics['sharpe']:.4f}",
-        f"{rts_metrics['max_drawdown']*100:.2f}%",
-        verdict,
-    ])
-
-    comp_table = tabulate(
-        comparison_rows,
-        headers=["Algorithm", "Annual Return", "Annual Risk",
-                 "Sharpe Ratio", "Max Drawdown", "Verdict"],
-        tablefmt="fancy_grid",
-    )
-
-    # Statistics across all 30 runs
+    # Statistics across all configured runs
     stats_rows = [
         ["Mean Sharpe", f"{np.mean(all_sharpes):.4f}"],
         ["Median Sharpe", f"{np.median(all_sharpes):.4f}"],
@@ -475,69 +376,89 @@ def main():
     stats_table = tabulate(stats_rows, headers=["Metric", "Value"],
                            tablefmt="grid")
 
-    with open("rts_comparison.txt", "w") as f:
-        f.write("Reactive Tabu Search — Comparative Verdict\n")
+    # Full per-run table for the saved file
+    run_rows_file = [
+        [f"{i + 1} (best)" if i == best_idx else i + 1, SEEDS[i],
+         f"{r['best_return']*100:.2f}%",
+         f"{r['best_risk']*100:.2f}%",
+         f"{r['best_sharpe']:.4f}"]
+        for i, r in enumerate(all_results)
+    ]
+    all_runs_table = tabulate(
+        run_rows_file,
+        headers=["Run #", "Seed", "Annual Return", "Annual Risk", "Sharpe"],
+        tablefmt="grid",
+    )
+
+    # Extended metric stats (mean/min/max/std for all three metrics)
+    full_metric_stats = [
+        ["Sharpe Ratio",
+         f"{np.mean(all_sharpes_arr):.4f}",
+         f"{np.min(all_sharpes_arr):.4f}",
+         f"{np.max(all_sharpes_arr):.4f}",
+         f"{np.std(all_sharpes_arr):.4f}"],
+    ]
+    full_stats_table = tabulate(
+        full_metric_stats,
+        headers=["Metric", "Mean", "Min", "Max", "Std Dev"],
+        tablefmt="grid",
+    )
+
+    with open(cfg.OUT_COMPARISON_TXT, "w") as f:
+        f.write(f"{ALGORITHM} — Final Metrics\n")
         f.write("Dataset: S&P 500 Top 10 Stocks | "
                 "Period: 2013–2023 | RF=2%\n")
         f.write("=" * 70 + "\n\n")
-        f.write(comp_table)
+        f.write(f"Individual Run Results ({NUM_RUNS} runs)\n")
+        f.write("-" * 60 + "\n")
+        f.write(all_runs_table)
         f.write("\n\n")
-        f.write("RTS Run Statistics (30 runs)\n")
-        f.write("-" * 40 + "\n")
-        f.write(stats_table)
+        f.write(f"{ALGORITHM} Run Statistics ({NUM_RUNS} runs) — All Metrics\n")
+        f.write("-" * 60 + "\n")
+        f.write(full_stats_table)
+        f.write("\n\n")
+        f.write("Best Portfolio — Stock-Level Allocation Detail\n")
+        f.write("-" * 60 + "\n")
+        f.write(alloc_table_str)
         f.write("\n")
 
-    print(comp_table)
-    print(f"\n  [✓] Comparison table saved: rts_comparison.txt")
+    print(f"\n  [✓] Summary table saved: {cfg.OUT_COMPARISON_TXT}")
 
-    # ── Step 7: OUTPUT 3 — Pareto Front Plot ──────────────────────
-    print("\n  [5] Generating Pareto front plot...")
-
-    # Merge all explored points from all runs
-    all_explored = []
-    for r in all_results:
-        all_explored.extend(r['all_explored'])
-
-    pareto_front = _build_pareto_front(all_explored)
-
-    # For the reference points on the plot, use approximate values
-    # (RMPSO may not have exact risk/return, estimate from Sharpe)
-    rmpso_plot_ref = None
-    # Try to estimate RMPSO risk/return from Sharpe assuming similar
-    # return profile — but since we don't have exact values, skip if None
-    if rmpso_ref.get('return') and rmpso_ref.get('risk'):
-        rmpso_plot_ref = rmpso_ref
-
-    cso_plot_ref = cso_ref
-
-    plot_pareto_front(
-        all_explored, pareto_front, best_result,
-        rmpso_plot_ref, cso_plot_ref,
-        returns_data, cov_daily, n_assets, RF,
-    )
+    # ── Step 7: Save run data for graph generation ────────────────────
+    print("\n  [5] Saving run data for graph generation...")
+    os.makedirs(cfg.OUTPUTS_DIR, exist_ok=True)
+    
+    run_data = {
+        "algorithm":    ALGORITHM,
+        "num_runs":     NUM_RUNS,
+        "best_idx":     best_idx,
+        "seeds":        SEEDS,
+        "stock_names":  stock_names,
+        "best_result": {
+            "best_sharpe":  best_result["best_sharpe"],
+            "best_return":  best_result["best_return"],
+            "best_risk":    best_result["best_risk"],
+            "best_weights": best_result["best_weights"].tolist(),
+        },
+        "all_results": [
+            {
+                "best_sharpe":      r["best_sharpe"],
+                "best_return":      r["best_return"],
+                "best_risk":        r["best_risk"],
+                "convergence_log":  [list(e) for e in r["convergence_log"]],
+            }
+            for r in all_results
+        ],
+    }
+    with open(cfg.OUT_RUN_DATA_JSON, "w") as f:
+        json.dump(run_data, f)
+    print(f"  [✓] Run data saved: {cfg.OUT_RUN_DATA_JSON}")
+    print(f"  →  Run  python generate_graphs.py  to regenerate the graphs.")
 
     # ── Final Summary ─────────────────────────────────────────────
     print("\n" + "=" * 70)
-    print("  REACTIVE TABU SEARCH — COMPLETE!")
-    print(f"  RTS Best Sharpe   = {best_result['best_sharpe']:.4f}")
-    print(f"  RMPSO Reference   = {rmpso_ref['sharpe']:.4f}")
-    print(f"  CSO (Paper Best)  = {cso_ref['sharpe']:.4f}")
-
-    improvement_rmpso = ((rts_metrics['sharpe'] - rmpso_ref['sharpe'])
-                         / rmpso_ref['sharpe'] * 100)
-    improvement_cso = ((rts_metrics['sharpe'] - cso_ref['sharpe'])
-                       / cso_ref['sharpe'] * 100)
-
-    if improvement_rmpso > 0:
-        print(f"  vs RMPSO          : +{improvement_rmpso:.2f}% ✅")
-    else:
-        print(f"  vs RMPSO          : {improvement_rmpso:.2f}%")
-
-    if improvement_cso > 0:
-        print(f"  vs CSO            : +{improvement_cso:.2f}% ✅")
-    else:
-        print(f"  vs CSO            : {improvement_cso:.2f}%")
-
+    print(f"  {ALGORITHM} — COMPLETE!")
+    print(f"  {ALGORITHM} Best Sharpe   = {best_result['best_sharpe']:.4f}")
     print("=" * 70)
 
 
